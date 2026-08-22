@@ -1,8 +1,12 @@
 package com.gautier.mywearload
 
+import android.content.Context
 import android.net.Uri
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,20 +20,84 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    
+    var nsdManager: NsdManager? = null
+    var discoveryListener: NsdManager.DiscoveryListener? = null
+    
+    // متغيرات لتحديث الواجهة آلياً
+    var autoIp = mutableStateOf("")
+    var autoPort = mutableStateOf("")
+    var isSearching = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
+        
         setContent {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WearLoadAdbUI(this)
+                    WearLoadAdbUI(this, autoIp.value, autoPort.value, isSearching.value)
                 }
             }
         }
+        
+        // بدء البحث الآلي عن الساعة بمجرد فتح التطبيق
+        startDiscovery()
+    }
+
+    // دالة البحث الآلي (الفكرة الجهنمية)
+    fun startDiscovery() {
+        isSearching.value = true
+        discoveryListener = object : NsdManager.DiscoveryListener {
+            override fun onDiscoveryStarted(regType: String) {}
+            override fun onServiceFound(service: NsdServiceInfo) {
+                // وجدنا خدمة اقتران ADB!
+                if (service.serviceType.contains("_adb-tls-pairing._tcp")) {
+                    nsdManager?.resolveService(service, object : NsdManager.ResolveListener {
+                        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+                        override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                            val hostAddress = serviceInfo.host.hostAddress
+                            val port = serviceInfo.port
+                            
+                            if (hostAddress != null) {
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    autoIp.value = hostAddress
+                                    autoPort.value = port.toString()
+                                    isSearching.value = false
+                                    Toast.makeText(this@MainActivity, "تم العثور على الساعة آلياً! ⌚", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    })
+                }
+            }
+            override fun onServiceLost(service: NsdServiceInfo) {}
+            override fun onDiscoveryStopped(serviceType: String) {}
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+        }
+        
+        try {
+            nsdManager?.discoverServices("_adb-tls-pairing._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        } catch (e: Exception) {
+            isSearching.value = false
+        }
+    }
+
+    override fun onDestroy() {
+        if (discoveryListener != null) {
+            try { nsdManager?.stopServiceDiscovery(discoveryListener) } catch (e: Exception) {}
+        }
+        super.onDestroy()
     }
 
     fun getFileName(uri: Uri): String {
@@ -60,13 +128,13 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WearLoadAdbUI(activity: MainActivity) {
+fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPort: String, isSearching: Boolean) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
     
-    // المتغيرات الجديدة بناءً على ملاحظتك
-    var ipAddress by remember { mutableStateOf("192.168.") }
-    var portNumber by remember { mutableStateOf("") }
+    // ربط الحقول بالمتغيرات الآلية
+    var ipAddress by remember(autoIp) { mutableStateOf(autoIp) }
+    var portNumber by remember(autoPort) { mutableStateOf(autoPort) }
     var pairingCode by remember { mutableStateOf("") }
     
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -91,15 +159,19 @@ fun WearLoadAdbUI(activity: MainActivity) {
         )
         
         Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "ADB Wireless Installer", color = MaterialTheme.colorScheme.secondary)
+        
+        if (isSearching) {
+            Text(text = "🔍 جاري البحث عن الساعة آلياً...", color = MaterialTheme.colorScheme.tertiary)
+        } else {
+            Text(text = "ADB Auto-Discovery 🚀", color = MaterialTheme.colorScheme.secondary)
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // 1. حقل الـ IP
         OutlinedTextField(
             value = ipAddress,
             onValueChange = { ipAddress = it },
-            label = { Text("عنوان IP (مثال: 192.168.100.161)") },
+            label = { Text("عنوان IP") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -108,7 +180,6 @@ fun WearLoadAdbUI(activity: MainActivity) {
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // 2. حقل الـ Port
             OutlinedTextField(
                 value = portNumber,
                 onValueChange = { portNumber = it },
@@ -118,7 +189,6 @@ fun WearLoadAdbUI(activity: MainActivity) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
             
-            // 3. حقل كود الاقتران
             OutlinedTextField(
                 value = pairingCode,
                 onValueChange = { pairingCode = it },
@@ -150,7 +220,7 @@ fun WearLoadAdbUI(activity: MainActivity) {
 
         Button(
             onClick = { 
-                // كود مكتبة الـ ADB سيوضع هنا قريباً
+                // كود تثبيت ADB الحقيقي سيوضع هنا
             },
             enabled = selectedFileUri != null && ipAddress.isNotEmpty() && portNumber.isNotEmpty() && pairingCode.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
