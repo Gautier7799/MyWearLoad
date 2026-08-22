@@ -1,5 +1,6 @@
 package com.gautier.mywearload
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -18,8 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +38,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // دالة للحصول على اسم الملف
     fun getFileName(uri: Uri): String {
         var result: String? = null
         if (uri.scheme == "content") {
@@ -62,7 +66,7 @@ fun WearBluetoothUI(activity: MainActivity) {
         if (uri != null) {
             selectedFileUri = uri
             selectedFileName = activity.getFileName(uri)
-            processStatus = "" // تصفير الحالة عند اختيار ملف جديد
+            processStatus = "" 
         }
     }
 
@@ -114,12 +118,11 @@ fun WearBluetoothUI(activity: MainActivity) {
         Button(
             onClick = { 
                 coroutineScope.launch {
-                    // هنا سنضع كود إرسال البلوتوث الحقيقي لاحقاً
-                    processStatus = "⏳ جاري تحضير الملف..."
-                    delay(1000)
-                    processStatus = "📡 جاري الإرسال عبر البلوتوث للساعة..."
-                    delay(2000)
-                    processStatus = "✅ تم الإرسال! راجع شاشة ساعتك الآن."
+                    if (selectedFileUri != null) {
+                        sendApkToWatch(activity, selectedFileUri!!) { status ->
+                            processStatus = status
+                        }
+                    }
                 }
             },
             enabled = selectedFileUri != null,
@@ -129,6 +132,52 @@ fun WearBluetoothUI(activity: MainActivity) {
             Icon(Icons.Filled.Send, contentDescription = "Send", modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("2. إرسال للساعة 🚀")
+        }
+    }
+}
+
+// ----------------------------------------------------
+// محرك الإرسال الفعلي عبر البلوتوث (Wearable Data Layer)
+// ----------------------------------------------------
+suspend fun sendApkToWatch(context: Context, apkUri: Uri, onProgress: (String) -> Unit) {
+    withContext(Dispatchers.IO) {
+        try {
+            onProgress("🔍 جاري البحث عن الساعة المتصلة بالبلوتوث...")
+            
+            // جلب الأجهزة (الساعات) المتصلة
+            val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+            val watchNode = nodes.firstOrNull()
+
+            if (watchNode == null) {
+                onProgress("❌ لم يتم العثور على ساعة متصلة! تأكد من البلوتوث.")
+                return@withContext
+            }
+
+            onProgress("🔗 تم إيجاد: ${watchNode.displayName}. جاري فتح قناة النقل...")
+            val channelClient = Wearable.getChannelClient(context)
+            
+            // فتح قناة اتصال سريعة مع الساعة
+            val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
+
+            onProgress("📡 جاري إرسال الملف... (قد يستغرق بضع ثوانٍ)")
+            val outputStream = Tasks.await(channelClient.getOutputStream(channel))
+            val inputStream = context.contentResolver.openInputStream(apkUri)
+
+            if (inputStream != null && outputStream != null) {
+                // ضخ الملف من الهاتف إلى الساعة
+                inputStream.copyTo(outputStream)
+                
+                inputStream.close()
+                outputStream.close()
+                onProgress("✅ تم الإرسال بنجاح! راجع شاشة ساعتك الآن لتأكيد التثبيت.")
+            } else {
+                onProgress("❌ حدث خطأ أثناء قراءة الملف من الهاتف.")
+            }
+            
+            channelClient.close(channel)
+
+        } catch (e: Exception) {
+            onProgress("❌ فشل الإرسال: تأكد من اتصال الساعة.")
         }
     }
 }
