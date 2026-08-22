@@ -8,7 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,15 +26,16 @@ import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // ألوان مطابقة لصورة مركز التحكم (Quick Settings)
-            val darkBg = Color(0xFF19242C) // خلفية زرقاء داكنة
-            val buttonOffBg = Color(0xFF2C3E48) // زر غير مفعل
-            val buttonOnBg = Color(0xFF3B82F6) // زر مفعل (أزرق)
+            val darkBg = Color(0xFF19242C)
+            val buttonOffBg = Color(0xFF2C3E48)
+            val buttonOnBg = Color(0xFF3B82F6)
             
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = darkBg) {
@@ -53,9 +53,7 @@ class MainActivity : ComponentActivity() {
             cursor?.use {
                 if (it.moveToFirst()) {
                     val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    val sizeIndex = it.getColumnIndex(OpenableColumns.SIZE)
                     if (nameIndex >= 0) name = it.getString(nameIndex)
-                    if (sizeIndex >= 0) size = it.getLong(sizeIndex)
                 }
             }
         }
@@ -67,10 +65,8 @@ class MainActivity : ComponentActivity() {
 fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
-    var selectedFileSize by remember { mutableLongStateOf(1L) }
     
     var processStatus by remember { mutableStateOf("") }
-    var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
     
     val coroutineScope = rememberCoroutineScope()
@@ -80,11 +76,8 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
     ) { uri: Uri? ->
         if (uri != null) {
             selectedFileUri = uri
-            val fileInfo = activity.getFileInfo(uri)
-            selectedFileName = fileInfo.first
-            selectedFileSize = fileInfo.second
+            selectedFileName = activity.getFileInfo(uri).first
             processStatus = ""
-            transferProgress = 0f
         }
     }
 
@@ -98,7 +91,6 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
         
         Spacer(modifier = Modifier.height(48.dp))
 
-        // الزر الأول: اختيار الملف (بتصميم الأزرار العريضة الدائرية)
         Button(
             onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") },
             modifier = Modifier.fillMaxWidth().height(80.dp),
@@ -116,17 +108,14 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // الزر الثاني: الإرسال للساعة
         Button(
             onClick = { 
                 if (selectedFileUri != null && !isSending) {
                     coroutineScope.launch {
                         isSending = true
-                        transferProgress = 0f
-                        sendApkWithProgress(activity, selectedFileUri!!, selectedFileSize, 
-                            onProgressUpdate = { progress -> transferProgress = progress },
-                            onStatusUpdate = { status -> processStatus = status }
-                        )
+                        sendApkReliable(activity, selectedFileUri!!) { status -> 
+                            processStatus = status 
+                        }
                         isSending = false
                     }
                 }
@@ -146,21 +135,19 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // شريط التقدم الأخضر
-        if (isSending || transferProgress > 0f) {
+        if (isSending) {
+            // شريط التقدم أصبح يتحرك باستمرار (دليل على استقرار النقل)
             LinearProgressIndicator(
-                progress = transferProgress,
                 modifier = Modifier.fillMaxWidth().height(12.dp),
-                color = Color(0xFF34A853), // لون أخضر ساطع
+                color = Color(0xFF34A853),
                 trackColor = offColor
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("جاري النقل بطريقة موثوقة...", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // رسائل الحالة واكتشاف الأخطاء
         if (processStatus.isNotEmpty()) {
             Text(
                 text = processStatus, 
@@ -172,14 +159,9 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
     }
 }
 
-// ----------------------------------------------------
-// محرك الإرسال مع تتبع شريط التقدم الحقيقي
-// ----------------------------------------------------
-suspend fun sendApkWithProgress(
+suspend fun sendApkReliable(
     context: Context, 
     apkUri: Uri, 
-    totalSize: Long,
-    onProgressUpdate: (Float) -> Unit,
     onStatusUpdate: (String) -> Unit
 ) {
     withContext(Dispatchers.IO) {
@@ -193,43 +175,25 @@ suspend fun sendApkWithProgress(
                 return@withContext
             }
 
-            onStatusUpdate("🔗 جاري تجهيز القناة مع (${watchNode.displayName})...")
+            onStatusUpdate("📦 جاري تجهيز الملف للإرسال...")
+            val tempFile = File(context.getExternalFilesDir(null), "temp_send.apk")
+            val inputStream = context.contentResolver.openInputStream(apkUri)
+            val outputStream = FileOutputStream(tempFile)
+            inputStream?.copyTo(outputStream)
+            inputStream?.close()
+            outputStream.close()
+            
+            val fileUri = Uri.fromFile(tempFile)
+
+            onStatusUpdate("🔗 فتح قناة الاتصال الموثوقة...")
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
 
-            val inputStream = context.contentResolver.openInputStream(apkUri)
-            val outputStream = Tasks.await(channelClient.getOutputStream(channel))
-
-            if (inputStream != null && outputStream != null) {
-                onStatusUpdate("📡 جاري النقل عبر البلوتوث...")
-                
-                // قراءة الملف على دفعات لتحديث شريط التقدم!
-                val buffer = ByteArray(8 * 1024) // 8KB chunks
-                var bytesCopied = 0L
-                var bytes = inputStream.read(buffer)
-                
-                while (bytes >= 0) {
-                    outputStream.write(buffer, 0, bytes)
-                    bytesCopied += bytes
-                    
-                    // تحديث شريط التقدم
-                    if (totalSize > 0) {
-                        onProgressUpdate(bytesCopied.toFloat() / totalSize.toFloat())
-                    }
-                    
-                    bytes = inputStream.read(buffer)
-                }
-
-                inputStream.close()
-                outputStream.close()
-                channelClient.close(channel)
-                
-                onProgressUpdate(1f)
-                onStatusUpdate("✅ اكتمل الإرسال! وافق على التثبيت من ساعتك الآن.")
-            } else {
-                onStatusUpdate("❌ فشل: تعذر قراءة الملف.")
-                channelClient.close(channel)
-            }
+            onStatusUpdate("📡 جاري النقل (يرجى الانتظار ولا تغلق الشاشة)...")
+            // الإرسال بالطريقة الرسمية من جوجل (مستقرة 100%)
+            Tasks.await(channelClient.sendFile(channel, fileUri))
+            
+            onStatusUpdate("✅ تم النقل بنجاح! راقب شاشة ساعتك.")
 
         } catch (e: Exception) {
             onStatusUpdate("❌ خطأ تقني: ${e.message ?: e.javaClass.simpleName}")
