@@ -18,37 +18,42 @@ class WearReceiverService : WearableListenerService() {
         super.onChannelOpened(channel)
         
         if (channel.path == "/wearload_apk_transfer") {
-            // إعطاء الساعة منشط يمنعها من إغلاق الاتصال!
-            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
-            val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WearLoad::TransferLock")
-            wakeLock.acquire(10 * 60 * 1000L) // 10 دقائق كحد أقصى
             
-            try {
-                val channelClient = Wearable.getChannelClient(applicationContext)
-                val inputStream = Tasks.await(channelClient.getInputStream(channel))
+            // 🚨 السر هنا: نضع عملية الاستقبال في "Thread خلفي" لكي لا نقطع الاتصال أبداً!
+            Thread {
+                // إعطاء الساعة منشط يمنعها من النوم العميق
+                val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+                val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WearLoad::BackgroundTransfer")
+                wakeLock.acquire(10 * 60 * 1000L) // 10 دقائق كحد أقصى
                 
-                val apkFile = File(getExternalFilesDir(null), "received_cadran.apk")
-                val outputStream = FileOutputStream(apkFile)
-                
-                val buffer = ByteArray(8 * 1024)
-                var bytes = inputStream.read(buffer)
-                while (bytes >= 0) {
-                    outputStream.write(buffer, 0, bytes)
-                    bytes = inputStream.read(buffer)
+                try {
+                    val channelClient = Wearable.getChannelClient(applicationContext)
+                    val inputStream = Tasks.await(channelClient.getInputStream(channel))
+                    
+                    val apkFile = File(cacheDir, "received_cadran_pro.apk")
+                    val outputStream = FileOutputStream(apkFile)
+                    
+                    // استقبال الملف بهدوء والشاشة مغلقة
+                    val buffer = ByteArray(8 * 1024)
+                    var bytes = inputStream.read(buffer)
+                    while (bytes >= 0) {
+                        outputStream.write(buffer, 0, bytes)
+                        bytes = inputStream.read(buffer)
+                    }
+                    
+                    inputStream.close()
+                    outputStream.close()
+                    channelClient.close(channel)
+                    
+                    // إطلاق نافذة التثبيت عندما تفتح الساعة
+                    installApk(apkFile)
+                    
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    if (wakeLock.isHeld) wakeLock.release()
                 }
-                
-                inputStream.close()
-                outputStream.close()
-                channelClient.close(channel)
-                
-                // بدء التثبيت
-                installApk(apkFile)
-                
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                if (wakeLock.isHeld) wakeLock.release()
-            }
+            }.start() // تشغيل الخيط الخلفي
         }
     }
 
@@ -73,13 +78,9 @@ class WearReceiverService : WearableListenerService() {
             input.close()
             out.close()
 
-            // رسالة التثبيت الرسمية
             val intent = Intent(this, MainActivity::class.java)
             val pendingIntent = PendingIntent.getActivity(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             session.commit(pendingIntent.intentSender)
             session.close()
