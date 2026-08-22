@@ -33,5 +33,10 @@
             </intent-filter>
         </service>
 
+        <!-- 🚨 الإضافة الجديدة: مستقبل رسائل التثبيت (لإجبار نافذة الموافقة على الظهور) 🚨 -->
+        <receiver
+            android:name=".InstallReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>
