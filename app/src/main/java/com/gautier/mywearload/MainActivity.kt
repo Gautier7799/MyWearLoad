@@ -11,7 +11,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,9 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStreamReader
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
     
@@ -39,7 +42,8 @@ class MainActivity : ComponentActivity() {
     var discoveryListener: NsdManager.DiscoveryListener? = null
     
     var autoIp = mutableStateOf("")
-    var autoPort = mutableStateOf("")
+    var autoPairPort = mutableStateOf("")
+    var autoConnectPort = mutableStateOf("")
     var isSearching = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,11 +52,8 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    WearLoadAdbUI(this, autoIp.value, autoPort.value, isSearching.value)
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    WearLoadAdbUI(this, autoIp.value, autoPairPort.value, autoConnectPort.value, isSearching.value)
                 }
             }
         }
@@ -64,25 +65,33 @@ class MainActivity : ComponentActivity() {
         }
         isSearching.value = true
         autoIp.value = ""
-        autoPort.value = ""
+        autoPairPort.value = ""
+        autoConnectPort.value = ""
 
         discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(regType: String) {}
             override fun onServiceFound(service: NsdServiceInfo) {
+                // اصطياد بورت الاقتران
                 if (service.serviceType.contains("_adb-tls-pairing._tcp")) {
                     nsdManager?.resolveService(service, object : NsdManager.ResolveListener {
                         override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
                         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-                            val hostAddress = serviceInfo.host.hostAddress
-                            val port = serviceInfo.port
-                            
-                            if (hostAddress != null) {
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    autoIp.value = hostAddress
-                                    autoPort.value = port.toString()
-                                    isSearching.value = false
-                                    Toast.makeText(this@MainActivity, "تم التقاط الساعة بنجاح! ⌚", Toast.LENGTH_SHORT).show()
-                                }
+                            CoroutineScope(Dispatchers.Main).launch {
+                                autoIp.value = serviceInfo.host.hostAddress ?: ""
+                                autoPairPort.value = serviceInfo.port.toString()
+                                checkDiscoveryDone()
+                            }
+                        }
+                    })
+                }
+                // اصطياد بورت الاتصال
+                if (service.serviceType.contains("_adb-tls-connect._tcp")) {
+                    nsdManager?.resolveService(service, object : NsdManager.ResolveListener {
+                        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+                        override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                autoConnectPort.value = serviceInfo.port.toString()
+                                checkDiscoveryDone()
                             }
                         }
                     })
@@ -96,8 +105,16 @@ class MainActivity : ComponentActivity() {
         
         try {
             nsdManager?.discoverServices("_adb-tls-pairing._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+            nsdManager?.discoverServices("_adb-tls-connect._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener)
         } catch (e: Exception) {
             isSearching.value = false
+        }
+    }
+
+    fun checkDiscoveryDone() {
+        if (autoPairPort.value.isNotEmpty() && autoConnectPort.value.isNotEmpty()) {
+            isSearching.value = false
+            Toast.makeText(this, "تم التقاط جميع بيانات الساعة بنجاح! ⌚", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -108,6 +125,20 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    // دالة لنسخ ملف APK من الـ URI إلى مسار حقيقي لكي يقرأه ADB
+    fun getRealApkPath(uri: Uri): String? {
+        try {
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val file = File(cacheDir, "temp_app.apk")
+            FileOutputStream(file).use { output ->
+                inputStream.copyTo(output)
+            }
+            return file.absolutePath
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
     fun getFileName(uri: Uri): String {
         var result: String? = null
         if (uri.scheme == "content") {
@@ -115,20 +146,9 @@ class MainActivity : ComponentActivity() {
             try {
                 if (cursor != null && cursor.moveToFirst()) {
                     val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index >= 0) {
-                        result = cursor.getString(index)
-                    }
+                    if (index >= 0) { result = cursor.getString(index) }
                 }
-            } finally {
-                cursor?.close()
-            }
-        }
-        if (result == null) {
-            result = uri.path
-            val cut = result?.lastIndexOf('/') ?: -1
-            if (cut != -1) {
-                result = result?.substring(cut + 1)
-            }
+            } finally { cursor?.close() }
         }
         return result ?: "app.apk"
     }
@@ -136,12 +156,13 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPort: String, isSearching: Boolean) {
+fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPairPort: String, autoConnectPort: String, isSearching: Boolean) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
     
     var ipAddress by remember(autoIp) { mutableStateOf(autoIp) }
-    var portNumber by remember(autoPort) { mutableStateOf(autoPort) }
+    var pairPort by remember(autoPairPort) { mutableStateOf(autoPairPort) }
+    var connectPort by remember(autoConnectPort) { mutableStateOf(autoConnectPort) }
     var pairingCode by remember { mutableStateOf("") }
     
     var processStatus by remember { mutableStateOf("") }
@@ -157,25 +178,13 @@ fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPort: String, isSe
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "My WearLoad Pro", 
-            style = MaterialTheme.typography.headlineMedium, 
-            fontWeight = FontWeight.Bold, 
-            color = MaterialTheme.colorScheme.primary
-        )
+        Text("My WearLoad Pro", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- دليل الاستخدام ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Info, contentDescription = "Guide", tint = MaterialTheme.colorScheme.primary)
@@ -192,48 +201,24 @@ fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPort: String, isSe
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = { activity.startDiscovery() },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Button(onClick = { activity.startDiscovery() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary), modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.Refresh, contentDescription = "Search", modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(if (isSearching) "جاري البحث عن الساعة..." else "بحث آلي عن الساعة 🔍")
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
-        OutlinedTextField(
-            value = ipAddress,
-            onValueChange = { ipAddress = it },
-            label = { Text("عنوان IP") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-        
+        OutlinedTextField(value = ipAddress, onValueChange = { ipAddress = it }, label = { Text("عنوان IP") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = portNumber,
-                onValueChange = { portNumber = it },
-                label = { Text("Port") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-            
-            OutlinedTextField(
-                value = pairingCode,
-                onValueChange = { pairingCode = it },
-                label = { Text("كود الاقتران (6 أرقام)") },
-                modifier = Modifier.weight(1.5f),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
+            OutlinedTextField(value = pairPort, onValueChange = { pairPort = it }, label = { Text("بورت الاقتران") }, modifier = Modifier.weight(1f), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            OutlinedTextField(value = connectPort, onValueChange = { connectPort = it }, label = { Text("بورت الاتصال") }, modifier = Modifier.weight(1f), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(value = pairingCode, onValueChange = { pairingCode = it }, label = { Text("كود الاقتران (6 أرقام)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         
         Spacer(modifier = Modifier.height(16.dp))
         
@@ -244,11 +229,7 @@ fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPort: String, isSe
         }
         
         Spacer(modifier = Modifier.height(8.dp))
-
-        Button(
-            onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Button(onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, modifier = Modifier.fillMaxWidth()) {
             Text("1. اختر ملف APK")
         }
 
@@ -262,66 +243,111 @@ fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPort: String, isSe
         Button(
             onClick = { 
                 coroutineScope.launch {
-                    val engine = AdbEngine(activity)
-                    val paired = engine.pairDevice(ipAddress, portNumber, pairingCode) { status ->
-                        processStatus = status
-                    }
-                    if (paired && selectedFileUri != null) {
-                        engine.installApk(ipAddress, portNumber, selectedFileUri!!) { status ->
+                    val engine = RealAdbEngine(activity)
+                    val realApkPath = activity.getRealApkPath(selectedFileUri!!)
+                    
+                    if (realApkPath != null) {
+                        val paired = engine.pairAndConnect(ipAddress, pairPort, connectPort, pairingCode) { status ->
                             processStatus = status
                         }
+                        if (paired) {
+                            engine.installApk(ipAddress, connectPort, realApkPath) { status ->
+                                processStatus = status
+                            }
+                        }
+                    } else {
+                        processStatus = "❌ خطأ في قراءة ملف الـ APK"
                     }
                 }
             },
-            enabled = selectedFileUri != null && ipAddress.isNotEmpty() && portNumber.isNotEmpty() && pairingCode.isNotEmpty(),
+            enabled = selectedFileUri != null && ipAddress.isNotEmpty() && pairPort.isNotEmpty() && connectPort.isNotEmpty() && pairingCode.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("2. اقتران وتثبيت")
+            Text("2. اقتران وتثبيت الحقيقي 🚀")
         }
-        
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
 // ----------------------------------------------------
-// محرك ADB (مدمج في نفس الملف لتفادي أخطاء GitHub)
+// المحرك الحقيقي (Real ADB Engine) 🚀
 // ----------------------------------------------------
-class AdbEngine(private val context: Context) {
+class RealAdbEngine(private val context: Context) {
 
-    suspend fun pairDevice(ip: String, port: String, pairingCode: String, onProgress: (String) -> Unit): Boolean {
-        return withContext(Dispatchers.IO) {
+    // دالة لتحميل أداة ADB وتجهيزها
+    private suspend fun setupAdb(onProgress: (String) -> Unit): String? = withContext(Dispatchers.IO) {
+        val adbFile = File(context.filesDir, "adb")
+        if (!adbFile.exists()) {
+            onProgress("📥 جاري تحميل محرك ADB لأول مرة (لمرة واحدة فقط)...")
             try {
-                onProgress("⏳ جاري إنشاء اتصال آمن (TLS) مع $ip:$port...")
-                delay(1500)
-                
-                onProgress("🔐 جاري إرسال كود الاقتران: $pairingCode...")
-                delay(1500)
-                
-                onProgress("✅ تم الاقتران بالساعة بنجاح!")
-                true
+                // تحميل نسخة أصلية من أداة ADB مخصصة لمعالجات الهواتف
+                URL("https://raw.githubusercontent.com/tytydraco/ADB-Binaries/master/binaries/arm64-v8a/adb").openStream().use { input ->
+                    FileOutputStream(adbFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                adbFile.setExecutable(true) // إعطاء صلاحية التشغيل
             } catch (e: Exception) {
-                onProgress("❌ فشل الاقتران: ${e.message}")
-                false
+                onProgress("❌ فشل تحميل محرك ADB: ${e.message}")
+                return@withContext null
             }
+        }
+        return@withContext adbFile.absolutePath
+    }
+
+    // تنفيذ أوامر سطر الأوامر
+    private fun execCmd(cmd: String): String {
+        return try {
+            val process = Runtime.getRuntime().exec(cmd)
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val errorReader = BufferedReader(InputStreamReader(process.errorStream))
+            val output = StringBuilder()
+            var line: String?
+            while (reader.readLine().also { line = it } != null) { output.append(line).append("\n") }
+            while (errorReader.readLine().also { line = it } != null) { output.append(line).append("\n") }
+            process.waitFor()
+            output.toString()
+        } catch (e: Exception) {
+            e.toString()
         }
     }
 
-    suspend fun installApk(ip: String, port: String, apkUri: Uri, onProgress: (String) -> Unit): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                onProgress("📦 جاري تحضير ملف APK للنقل...")
-                delay(1000)
-                
-                onProgress("🚀 جاري التثبيت على الساعة (قد يستغرق وقتاً)...")
-                delay(3000) 
-                
-                onProgress("🎉 تمت عملية التثبيت بنجاح!")
-                true
-            } catch (e: Exception) {
-                onProgress("❌ فشل التثبيت: ${e.message}")
-                false
-            }
+    suspend fun pairAndConnect(ip: String, pairPort: String, connectPort: String, code: String, onProgress: (String) -> Unit): Boolean = withContext(Dispatchers.IO) {
+        val adbPath = setupAdb(onProgress) ?: return@withContext false
+        
+        // 1. الاقتران
+        onProgress("🔐 جاري إرسال كود الاقتران...")
+        val pairResult = execCmd("$adbPath pair $ip:$pairPort $code")
+        if (!pairResult.contains("Successfully paired")) {
+            onProgress("❌ فشل الاقتران: تأكد من الكود وأن شاشة الساعة مضاءة.\n$pairResult")
+            return@withContext false
+        }
+
+        // 2. الاتصال
+        onProgress("🔗 جاري الاتصال بالساعة...")
+        val connectResult = execCmd("$adbPath connect $ip:$connectPort")
+        if (!connectResult.contains("connected")) {
+            onProgress("❌ فشل الاتصال بالساعة.\n$connectResult")
+            return@withContext false
+        }
+        
+        onProgress("✅ تم الاتصال بنجاح!")
+        return@withContext true
+    }
+
+    suspend fun installApk(ip: String, connectPort: String, apkPath: String, onProgress: (String) -> Unit): Boolean = withContext(Dispatchers.IO) {
+        val adbPath = File(context.filesDir, "adb").absolutePath
+        
+        onProgress("🚀 جاري رفع وتثبيت التطبيق على الساعة (قد يستغرق وقتاً)...")
+        val installResult = execCmd("$adbPath -s $ip:$connectPort install -r $apkPath")
+        
+        if (installResult.contains("Success")) {
+            onProgress("🎉 تمت عملية التثبيت بنجاح على ساعتك!")
+            return@withContext true
+        } else {
+            onProgress("❌ فشل التثبيت:\n$installResult")
+            return@withContext false
         }
     }
 }
