@@ -2,6 +2,7 @@ package com.gautier.mywearload
 
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,6 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,7 +30,41 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WearLoadUI()
+                    WearLoadUI(this) // نمرر الـ Context هنا
+                }
+            }
+        }
+    }
+
+    // دالة لإرسال الملف إلى الساعة عبر Data Layer API
+    fun sendApkToWatch(uri: Uri) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 1. قراءة الملف من الهاتف كـ Bytes (بيانات خام)
+                val inputStream = contentResolver.openInputStream(uri)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+
+                if (bytes != null) {
+                    // 2. تجهيز البيانات للإرسال عبر البلوتوث للساعة
+                    val dataMapRequest = PutDataMapRequest.create("/apk_transfer")
+                    dataMapRequest.dataMap.putByteArray("apk_data", bytes)
+                    dataMapRequest.dataMap.putLong("timestamp", System.currentTimeMillis()) // لإجبار الساعة على استقباله حتى لو تكرر
+
+                    val putDataRequest = dataMapRequest.asPutDataRequest()
+                    putDataRequest.setUrgent() // إرسال سريع
+
+                    // 3. أمر الإرسال الفعلي
+                    Wearable.getDataClient(this@MainActivity).putDataItem(putDataRequest).await()
+                    
+                    // 4. إظهار رسالة نجاح
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "تم الإرسال للساعة بنجاح!", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "حدث خطأ: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -31,11 +72,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WearLoadUI() {
-    // متغير لحفظ مسار الملف الذي سيختاره المستخدم
+fun WearLoadUI(activity: MainActivity) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
+    var isSending by remember { mutableStateOf(false) } // متغير لمعرفة هل جاري الإرسال
 
-    // أداة لفتح مدير الملفات في الهاتف
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -51,18 +91,11 @@ fun WearLoadUI() {
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // عرض حالة الملف (هل تم الاختيار أم لا)
         if (selectedFileUri != null) {
             Text(
-                text = "✅ تم اختيار الملف بنجاح!", 
+                text = "✅ تم اختيار الملف", 
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "مسار الملف:\n$selectedFileUri", 
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
             )
         } else {
             Text(text = "لم يتم اختيار أي ملف بعد.")
@@ -70,22 +103,26 @@ fun WearLoadUI() {
         
         Spacer(modifier = Modifier.height(24.dp))
 
-        // زر اختيار الملف
-        Button(onClick = { 
-            // فتح مدير الملفات للبحث عن ملفات (APK)
-            filePickerLauncher.launch("application/vnd.android.package-archive") 
-        }) {
+        Button(
+            onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") },
+            enabled = !isSending
+        ) {
             Text("اختر ملف APK من الهاتف")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // زر الإرسال للساعة (سيكون معطلاً حتى تقوم باختيار ملف)
         Button(
-            onClick = { /* سنقوم ببرمجة الإرسال للساعة عبر البلوتوث لاحقاً */ },
-            enabled = selectedFileUri != null
+            onClick = { 
+                if (selectedFileUri != null) {
+                    isSending = true
+                    activity.sendApkToWatch(selectedFileUri!!)
+                    isSending = false
+                }
+            },
+            enabled = selectedFileUri != null && !isSending
         ) {
-            Text("تثبيت على ساعة Wear OS")
+            Text(if (isSending) "جاري الإرسال..." else "تثبيت على ساعة Wear OS")
         }
     }
 }
