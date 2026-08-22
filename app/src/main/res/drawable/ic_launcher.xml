@@ -1,28 +1,42 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
     
-    <!-- الخلفية الداكنة الأنيقة -->
-    <path
-        android:pathData="M54,54m-54,0a54,54 0,1 1,108 0a54,54 0,1 1,-108 0"
-        android:fillColor="#131314"/>
-        
-    <!-- نجمة Gemini السحرية -->
-    <path
-        android:pathData="M54,16 C54,40 70,54 94,54 C70,54 54,68 54,92 C54,68 38,54 14,54 C38,54 54,40 54,16 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="14"
-                android:startY="16"
-                android:endX="94"
-                android:endY="92"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#669DF6" /> <!-- أزرق سماوي -->
-                <item android:offset="1.0" android:color="#D398FF" /> <!-- بنفسجي -->
-            </gradient>
-        </aapt:attr>
-    </path>
-</vector>
+    <!-- الخلفية الداكنة التي ستملأ الدائرة بالكامل -->
+    <background>
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:pathData="M0,0 h108 v108 h-108 Z"
+                android:fillColor="#151515"/>
+        </vector>
+    </background>
+    
+    <!-- النجمة الذهبية المتدرجة واللامعة -->
+    <foreground>
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:pathData="M54,24 C54,44 68,54 84,54 C68,54 54,64 54,84 C54,64 40,54 24,54 C40,54 54,44 54,24 Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                        android:startX="54"
+                        android:startY="24"
+                        android:endX="54"
+                        android:endY="84"
+                        android:type="linear">
+                        <item android:offset="0.0" android:color="#FFE082" /> <!-- أصفر ذهبي ساطع -->
+                        <item android:offset="1.0" android:color="#FF8F00" /> <!-- برتقالي دافئ -->
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </vector>
+    </foreground>
+    
+</adaptive-icon>
