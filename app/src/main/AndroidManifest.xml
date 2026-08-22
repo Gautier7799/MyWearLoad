@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- هذا هو الإذن السحري الذي يسمح لتطبيقنا برؤية تطبيق WearLoad الأصلي -->
-    <queries>
-        <package android:name="com.camope3.wearload" />
-    </queries>
+    <!-- الصلاحيات الجديدة المطلوبة للبحث عن الساعة عبر الواي فاي -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <application
         android:allowBackup="true"
