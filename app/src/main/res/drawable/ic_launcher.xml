@@ -2,41 +2,33 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt">
     
-    <!-- الخلفية الداكنة التي ستملأ الدائرة بالكامل -->
     <background>
         <vector
-            android:width="108dp"
-            android:height="108dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
-            <path
-                android:pathData="M0,0 h108 v108 h-108 Z"
-                android:fillColor="#151515"/>
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <!-- لون خلفية داكن جداً يبرز الألوان -->
+            <path android:pathData="M0,0 h108 v108 h-108 Z" android:fillColor="#111111"/>
         </vector>
     </background>
     
-    <!-- النجمة الذهبية المتدرجة واللامعة -->
     <foreground>
         <vector
-            android:width="108dp"
-            android:height="108dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
-            <path
-                android:pathData="M54,24 C54,44 68,54 84,54 C68,54 54,64 54,84 C54,64 40,54 24,54 C40,54 54,44 54,24 Z">
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <path android:pathData="M54,24 C54,44 68,54 84,54 C68,54 54,64 54,84 C54,64 40,54 24,54 C40,54 54,44 54,24 Z">
                 <aapt:attr name="android:fillColor">
+                    <!-- ألوان جوجل الأربعة مدمجة بتدرج لوني -->
                     <gradient
-                        android:startX="54"
-                        android:startY="24"
-                        android:endX="54"
-                        android:endY="84"
+                        android:startX="24" android:startY="24"
+                        android:endX="84" android:endY="84"
                         android:type="linear">
-                        <item android:offset="0.0" android:color="#FFE082" /> <!-- أصفر ذهبي ساطع -->
-                        <item android:offset="1.0" android:color="#FF8F00" /> <!-- برتقالي دافئ -->
+                        <item android:offset="0.0" android:color="#4285F4" /> <!-- أزرق -->
+                        <item android:offset="0.33" android:color="#EA4335" /> <!-- أحمر -->
+                        <item android:offset="0.66" android:color="#FBBC05" /> <!-- أصفر -->
+                        <item android:offset="1.0" android:color="#34A853" /> <!-- أخضر -->
                     </gradient>
                 </aapt:attr>
             </path>
         </vector>
     </foreground>
-    
 </adaptive-icon>
