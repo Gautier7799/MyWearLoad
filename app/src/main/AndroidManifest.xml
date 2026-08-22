@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.gautier.mywearload">
 
     <!-- الصلاحيات المطلوبة -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -7,24 +8,22 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
         android:label="My WearLoad"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.MyWearLoad">
+        android:supportsRtl="true">
 
         <!-- واجهة التطبيق الرئيسية -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyWearLoad">
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- خدمة استقبال الملفات للساعة (التي تمنع انقطاع الاتصال) -->
+        <!-- خدمة استقبال الملفات للساعة (تمنع انقطاع الاتصال) -->
         <service
             android:name=".WearReceiverService"
             android:exported="true">
