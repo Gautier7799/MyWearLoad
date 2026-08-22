@@ -19,9 +19,8 @@ class WearReceiverService : WearableListenerService() {
         
         if (channel.path == "/wearload_apk_transfer") {
             
-            // 🚨 السر هنا: نضع عملية الاستقبال في "Thread خلفي" لكي لا نقطع الاتصال أبداً!
+            // الاستقبال في "Thread خلفي" لكي لا ينقطع الاتصال
             Thread {
-                // إعطاء الساعة منشط يمنعها من النوم العميق
                 val powerManager = getSystemService(POWER_SERVICE) as PowerManager
                 val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WearLoad::BackgroundTransfer")
                 wakeLock.acquire(10 * 60 * 1000L) // 10 دقائق كحد أقصى
@@ -33,7 +32,6 @@ class WearReceiverService : WearableListenerService() {
                     val apkFile = File(cacheDir, "received_cadran_pro.apk")
                     val outputStream = FileOutputStream(apkFile)
                     
-                    // استقبال الملف بهدوء والشاشة مغلقة
                     val buffer = ByteArray(8 * 1024)
                     var bytes = inputStream.read(buffer)
                     while (bytes >= 0) {
@@ -45,7 +43,7 @@ class WearReceiverService : WearableListenerService() {
                     outputStream.close()
                     channelClient.close(channel)
                     
-                    // إطلاق نافذة التثبيت عندما تفتح الساعة
+                    // بعد اكتمال الاستقبال، نبدأ التثبيت
                     installApk(apkFile)
                     
                 } catch (e: Exception) {
@@ -53,7 +51,7 @@ class WearReceiverService : WearableListenerService() {
                 } finally {
                     if (wakeLock.isHeld) wakeLock.release()
                 }
-            }.start() // تشغيل الخيط الخلفي
+            }.start()
         }
     }
 
@@ -78,12 +76,18 @@ class WearReceiverService : WearableListenerService() {
             input.close()
             out.close()
 
-            val intent = Intent(this, MainActivity::class.java)
-            val pendingIntent = PendingIntent.getActivity(
-                this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            // 🔥 هذا هو التعديل السحري: نوجه النظام لملف InstallReceiver لكي يفتح نافذة الموافقة 🔥
+            val intent = Intent(this, InstallReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                this, 
+                0, 
+                intent, 
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
+            
             session.commit(pendingIntent.intentSender)
             session.close()
+            
         } catch (e: Exception) {
             e.printStackTrace()
         }
