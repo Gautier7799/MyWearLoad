@@ -1,5 +1,6 @@
 package com.gautier.mywearload
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -15,14 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
-import java.io.InputStream
-import java.io.OutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,54 +57,27 @@ class MainActivity : ComponentActivity() {
         return result ?: "app.apk"
     }
 
-    fun sendApkToWatch(uri: Uri, fileName: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+    // الدالة الجديدة: تسليم الملف لتطبيق WearLoad الأصلي
+    fun forwardApkToOriginalApp(uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                // توجيه الملف مباشرة لتطبيق WearLoad الأصلي إذا كان مثبتاً
+                setPackage("com.camope3.wearload") 
+            }
+            startActivity(intent)
+            Toast.makeText(this, "تم تحويل الملف للإرسال...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            // إذا لم يجد التطبيق الأصلي، يفتح قائمة المشاركة العادية
             try {
-                val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
-                val watchNode = nodes.firstOrNull()
-
-                if (watchNode == null) {
-                    runOnUiThread { Toast.makeText(this@MainActivity, "لم يتم العثور على ساعة متصلة بالبلوتوث!", Toast.LENGTH_LONG).show() }
-                    return@launch
+                val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
                 }
-
-                runOnUiThread { Toast.makeText(this@MainActivity, "جاري إعداد الساعة للاستقبال...", Toast.LENGTH_SHORT).show() }
-
-                // أضفنا مؤقت زمني (10 ثواني) حتى لا يعلق التطبيق إذا رفضت الساعة
-                withTimeout(10000) {
-                    val messageClient = Wearable.getMessageClient(this@MainActivity)
-                    messageClient.sendMessage(watchNode.id, "/file_name", fileName.toByteArray()).await()
-                    
-                    kotlinx.coroutines.delay(500)
-
-                    val channelClient = Wearable.getChannelClient(this@MainActivity)
-                    val channel = channelClient.openChannel(watchNode.id, "/file_channel").await()
-
-                    val inputStream: InputStream? = contentResolver.openInputStream(uri)
-                    val outputStream: OutputStream = channelClient.getOutputStream(channel).await()
-
-                    if (inputStream != null) {
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
-                        }
-
-                        outputStream.flush()
-                        outputStream.close()
-                        inputStream.close()
-                        channelClient.close(channel).await()
-
-                        runOnUiThread {
-                            Toast.makeText(this@MainActivity, "✅ تم إرسال $fileName للساعة بنجاح!", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    // سيظهر لنا الخطأ الفعلي الآن بدلاً من التعليق
-                    Toast.makeText(this@MainActivity, "فشل الإرسال: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                startActivity(Intent.createChooser(fallbackIntent, "اختر تطبيق WearLoad:"))
+            } catch (ex: Exception) {
+                Toast.makeText(this, "تطبيق WearLoad الأصلي غير موجود في الهاتف!", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -121,7 +87,6 @@ class MainActivity : ComponentActivity() {
 fun WearLoadUI(activity: MainActivity) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
-    var isSending by remember { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -150,10 +115,7 @@ fun WearLoadUI(activity: MainActivity) {
         
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") },
-            enabled = !isSending
-        ) {
+        Button(onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }) {
             Text("اختر ملف APK من الهاتف")
         }
 
@@ -162,19 +124,13 @@ fun WearLoadUI(activity: MainActivity) {
         Button(
             onClick = { 
                 if (selectedFileUri != null) {
-                    isSending = true
-                    // بمجرد انتهاء دالة الإرسال (نجاح أو فشل) سيعود الزر لطبيعته
-                    activity.sendApkToWatch(selectedFileUri!!, selectedFileName)
-                    CoroutineScope(Dispatchers.Main).launch {
-                        kotlinx.coroutines.delay(10500) // ننتظر حتى ينتهي المؤقت كحد أقصى
-                        isSending = false
-                    }
+                    activity.forwardApkToOriginalApp(selectedFileUri!!)
                 }
             },
-            enabled = selectedFileUri != null && !isSending,
+            enabled = selectedFileUri != null,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
         ) {
-            Text(if (isSending) "جاري الإرسال..." else "إرسال إلى Pixel Watch")
+            Text("إرسال إلى Pixel Watch")
         }
     }
 }
