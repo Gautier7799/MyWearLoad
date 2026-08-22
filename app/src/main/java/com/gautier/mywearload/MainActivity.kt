@@ -1,10 +1,8 @@
 package com.gautier.mywearload
 
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,7 +24,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WearLoadUI(this)
+                    WearLoadAdbUI(this)
                 }
             }
         }
@@ -56,38 +54,15 @@ class MainActivity : ComponentActivity() {
         }
         return result ?: "app.apk"
     }
-
-    // الدالة الجديدة: تسليم الملف لتطبيق WearLoad الأصلي
-    fun forwardApkToOriginalApp(uri: Uri) {
-        try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                // توجيه الملف مباشرة لتطبيق WearLoad الأصلي إذا كان مثبتاً
-                setPackage("com.camope3.wearload") 
-            }
-            startActivity(intent)
-            Toast.makeText(this, "تم تحويل الملف للإرسال...", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            // إذا لم يجد التطبيق الأصلي، يفتح قائمة المشاركة العادية
-            try {
-                val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                }
-                startActivity(Intent.createChooser(fallbackIntent, "اختر تطبيق WearLoad:"))
-            } catch (ex: Exception) {
-                Toast.makeText(this, "تطبيق WearLoad الأصلي غير موجود في الهاتف!", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WearLoadUI(activity: MainActivity) {
+fun WearLoadAdbUI(activity: MainActivity) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
-
+    var ipAddress by remember { mutableStateOf("") }
+    
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -98,39 +73,58 @@ fun WearLoadUI(activity: MainActivity) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "My WearLoad AI", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(
+            text = "My WearLoad Pro (ADB)", 
+            style = MaterialTheme.typography.headlineMedium, 
+            fontWeight = FontWeight.Bold, 
+            color = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = "مستقل تماماً 🚀 لا يحتاج لوسيط", color = MaterialTheme.colorScheme.secondary)
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        if (selectedFileUri != null) {
-            Text(text = "✅ تم اختيار:", color = MaterialTheme.colorScheme.secondary)
-            Text(text = selectedFileName, fontWeight = FontWeight.Medium)
-        } else {
-            Text(text = "لم يتم اختيار أي ملف بعد.")
-        }
+        OutlinedTextField(
+            value = ipAddress,
+            onValueChange = { ipAddress = it },
+            label = { Text("عنوان IP للساعة (مثال: 192.168.1.5)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
         
         Spacer(modifier = Modifier.height(24.dp))
+        
+        if (selectedFileUri != null) {
+            Text(text = "✅ تم اختيار: $selectedFileName", fontWeight = FontWeight.Medium)
+        } else {
+            Text(text = "لم يتم اختيار ملف APK")
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }) {
-            Text("اختر ملف APK من الهاتف")
+        Button(
+            onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("1. اختر ملف APK")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = { 
-                if (selectedFileUri != null) {
-                    activity.forwardApkToOriginalApp(selectedFileUri!!)
-                }
+                // سنقوم ببرمجة كود الاتصال السري (ADB) هنا في الخطوة القادمة!
             },
-            enabled = selectedFileUri != null,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            enabled = selectedFileUri != null && ipAddress.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("إرسال إلى Pixel Watch")
+            Text("2. تثبيت في الساعة (ADB)")
         }
     }
 }
