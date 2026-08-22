@@ -1,26 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.gautier.mywearload">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 1. أضف هذه الصلاحيات هنا (فوق الـ application) -->
+    <!-- الصلاحيات المطلوبة -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="My WearLoad"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyWearLoad">
-        
-        <!-- الأكواد الخاصة بـ MainActivity موجودة مسبقاً لديك، اتركها كما هي -->
-        <activity android:name=".MainActivity" ... >
-            ...
+
+        <!-- واجهة التطبيق الرئيسية -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyWearLoad">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
 
-        <!-- 2. 🔥 أضف هذا الكود هنا (داخل الـ application وقبل إغلاقه) 🔥 -->
-        <!-- هذا الكود هو الذي سيجعل الساعة تستيقظ وتستقبل الملف حتى والشاشة مغلقة -->
+        <!-- خدمة استقبال الملفات للساعة (التي تمنع انقطاع الاتصال) -->
         <service
             android:name=".WearReceiverService"
             android:exported="true">
