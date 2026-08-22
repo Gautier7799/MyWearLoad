@@ -125,13 +125,16 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
             val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
             val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
             if (watchNode == null) { onStatusUpdate("❌ فشل: تأكد من تشغيل البلوتوث!"); return@withContext }
-            onStatusUpdate("🔗 جاري تجهيز القناة...")
+            
+            onStatusUpdate("🔗 جاري فتح القناة...")
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
+            
             val inputStream = context.contentResolver.openInputStream(apkUri)
             val outputStream = Tasks.await(channelClient.getOutputStream(channel))
+            
             if (inputStream != null && outputStream != null) {
-                onStatusUpdate("📡 جاري النقل (أبقِ شاشة الساعة مضاءة!)...")
+                onStatusUpdate("📡 جاري النقل (يمكنك ترك شاشة الساعة تنطفئ الآن)...")
                 val buffer = ByteArray(8 * 1024)
                 var bytesCopied = 0L
                 var bytes = inputStream.read(buffer)
@@ -143,7 +146,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                 }
                 inputStream.close(); outputStream.close(); channelClient.close(channel)
                 onProgressUpdate(1f)
-                onStatusUpdate("✅ تم الإرسال! وافق على التثبيت في ساعتك الآن.")
+                onStatusUpdate("✅ تم الإرسال! افتح شاشة ساعتك للموافقة على التثبيت.")
             }
         } catch (e: Exception) { onStatusUpdate("❌ خطأ تقني: ${e.message ?: e.javaClass.simpleName}") }
     }
