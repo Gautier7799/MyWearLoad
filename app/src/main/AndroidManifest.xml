@@ -1,22 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.gautier.mywearload">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <!-- هذا هو الإذن السحري الذي يسمح لتطبيقنا برؤية تطبيق WearLoad الأصلي -->
+    <queries>
+        <package android:name="com.camope3.wearload" />
+    </queries>
 
     <application
         android:allowBackup="true"
-        android:label="MyWearLoad"
+        android:icon="@mipmap/ic_launcher"
+        android:label="My WearLoad AI"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
     </application>
+
 </manifest>
