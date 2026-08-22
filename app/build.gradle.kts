@@ -8,7 +8,8 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.camope3.wearload"
+        // 👈 رجعنا لاسم تطبيقنا الأصلي لكي لا يتصادم مع التطبيق القديم
+        applicationId = "com.gautier.mywearload" 
         minSdk = 26
         targetSdk = 34
         versionCode = 1
