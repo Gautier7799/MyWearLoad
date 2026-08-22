@@ -71,7 +71,6 @@ class MainActivity : ComponentActivity() {
         discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(regType: String) {}
             override fun onServiceFound(service: NsdServiceInfo) {
-                // اصطياد بورت الاقتران
                 if (service.serviceType.contains("_adb-tls-pairing._tcp")) {
                     nsdManager?.resolveService(service, object : NsdManager.ResolveListener {
                         override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
@@ -84,7 +83,6 @@ class MainActivity : ComponentActivity() {
                         }
                     })
                 }
-                // اصطياد بورت الاتصال
                 if (service.serviceType.contains("_adb-tls-connect._tcp")) {
                     nsdManager?.resolveService(service, object : NsdManager.ResolveListener {
                         override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
@@ -125,7 +123,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // دالة لنسخ ملف APK من الـ URI إلى مسار حقيقي لكي يقرأه ADB
     fun getRealApkPath(uri: Uri): String? {
         try {
             val inputStream = contentResolver.openInputStream(uri) ?: return null
@@ -271,23 +268,22 @@ fun WearLoadAdbUI(activity: MainActivity, autoIp: String, autoPairPort: String, 
 }
 
 // ----------------------------------------------------
-// المحرك الحقيقي (Real ADB Engine) 🚀
+// المحرك الحقيقي (Real ADB Engine)
 // ----------------------------------------------------
 class RealAdbEngine(private val context: Context) {
 
-    // دالة لتحميل أداة ADB وتجهيزها
     private suspend fun setupAdb(onProgress: (String) -> Unit): String? = withContext(Dispatchers.IO) {
         val adbFile = File(context.filesDir, "adb")
-        if (!adbFile.exists()) {
-            onProgress("📥 جاري تحميل محرك ADB لأول مرة (لمرة واحدة فقط)...")
+        if (!adbFile.exists() || adbFile.length() < 1000000) {
+            onProgress("📥 جاري تحميل محرك ADB (3 ميجابايت)...")
             try {
-                // تحميل نسخة أصلية من أداة ADB مخصصة لمعالجات الهواتف
-                URL("https://raw.githubusercontent.com/tytydraco/ADB-Binaries/master/binaries/arm64-v8a/adb").openStream().use { input ->
+                // الرابط الموثوق من Magisk
+                URL("https://raw.githubusercontent.com/Magisk-Modules-Repo/adb-ndk/master/bin/adb.bin-arm64").openStream().use { input ->
                     FileOutputStream(adbFile).use { output ->
                         input.copyTo(output)
                     }
                 }
-                adbFile.setExecutable(true) // إعطاء صلاحية التشغيل
+                adbFile.setExecutable(true)
             } catch (e: Exception) {
                 onProgress("❌ فشل تحميل محرك ADB: ${e.message}")
                 return@withContext null
@@ -296,7 +292,6 @@ class RealAdbEngine(private val context: Context) {
         return@withContext adbFile.absolutePath
     }
 
-    // تنفيذ أوامر سطر الأوامر
     private fun execCmd(cmd: String): String {
         return try {
             val process = Runtime.getRuntime().exec(cmd)
@@ -316,7 +311,6 @@ class RealAdbEngine(private val context: Context) {
     suspend fun pairAndConnect(ip: String, pairPort: String, connectPort: String, code: String, onProgress: (String) -> Unit): Boolean = withContext(Dispatchers.IO) {
         val adbPath = setupAdb(onProgress) ?: return@withContext false
         
-        // 1. الاقتران
         onProgress("🔐 جاري إرسال كود الاقتران...")
         val pairResult = execCmd("$adbPath pair $ip:$pairPort $code")
         if (!pairResult.contains("Successfully paired")) {
@@ -324,7 +318,6 @@ class RealAdbEngine(private val context: Context) {
             return@withContext false
         }
 
-        // 2. الاتصال
         onProgress("🔗 جاري الاتصال بالساعة...")
         val connectResult = execCmd("$adbPath connect $ip:$connectPort")
         if (!connectResult.contains("connected")) {
