@@ -18,12 +18,10 @@ class WearReceiverService : WearableListenerService() {
         super.onChannelOpened(channel)
         
         if (channel.path == "/wearload_apk_transfer") {
-            
-            // الاستقبال في "Thread خلفي" لكي لا ينقطع الاتصال
             Thread {
                 val powerManager = getSystemService(POWER_SERVICE) as PowerManager
                 val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WearLoad::BackgroundTransfer")
-                wakeLock.acquire(10 * 60 * 1000L) // 10 دقائق كحد أقصى
+                wakeLock.acquire(10 * 60 * 1000L)
                 
                 try {
                     val channelClient = Wearable.getChannelClient(applicationContext)
@@ -43,7 +41,6 @@ class WearReceiverService : WearableListenerService() {
                     outputStream.close()
                     channelClient.close(channel)
                     
-                    // بعد اكتمال الاستقبال، نبدأ التثبيت
                     installApk(apkFile)
                     
                 } catch (e: Exception) {
@@ -76,13 +73,17 @@ class WearReceiverService : WearableListenerService() {
             input.close()
             out.close()
 
-            // 🔥 هذا هو التعديل السحري: نوجه النظام لملف InstallReceiver لكي يفتح نافذة الموافقة 🔥
-            val intent = Intent(this, InstallReceiver::class.java)
-            val pendingIntent = PendingIntent.getBroadcast(
+            // 🔥 دمجنا كود إيقاظ الشاشة وفتح نافذة التثبيت هنا مباشرة 🔥
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("force_show_install", true)
+            }
+            
+            val pendingIntent = PendingIntent.getActivity(
                 this, 
                 0, 
                 intent, 
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             
             session.commit(pendingIntent.intentSender)
