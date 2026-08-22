@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -38,7 +39,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // دالة لاستخراج اسم الملف الحقيقي من الـ URI
     fun getFileName(uri: Uri): String {
         var result: String? = null
         if (uri.scheme == "content") {
@@ -61,57 +61,56 @@ class MainActivity : ComponentActivity() {
                 result = result?.substring(cut + 1)
             }
         }
-        return result ?: "app_from_my_wearload.apk"
+        return result ?: "app.apk"
     }
 
-    // الدالة المتوافقة مع تطبيق WearLoad الأصلي
     fun sendApkToWatch(uri: Uri, fileName: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. البحث عن الساعة المتصلة
                 val nodes = Wearable.getNodeClient(this@MainActivity).connectedNodes.await()
                 val watchNode = nodes.firstOrNull()
 
                 if (watchNode == null) {
-                    runOnUiThread { Toast.makeText(this@MainActivity, "لم يتم العثور على ساعة متصلة!", Toast.LENGTH_LONG).show() }
+                    runOnUiThread { Toast.makeText(this@MainActivity, "لم يتم العثور على ساعة متصلة بالبلوتوث!", Toast.LENGTH_LONG).show() }
                     return@launch
                 }
 
                 runOnUiThread { Toast.makeText(this@MainActivity, "جاري إعداد الساعة للاستقبال...", Toast.LENGTH_SHORT).show() }
 
-                // 2. إرسال اسم الملف أولاً (هذا ما ينتظره التطبيق الأصلي على الساعة)
-                val messageClient = Wearable.getMessageClient(this@MainActivity)
-                messageClient.sendMessage(watchNode.id, "/file_name", fileName.toByteArray()).await()
+                // أضفنا مؤقت زمني (10 ثواني) حتى لا يعلق التطبيق إذا رفضت الساعة
+                withTimeout(10000) {
+                    val messageClient = Wearable.getMessageClient(this@MainActivity)
+                    messageClient.sendMessage(watchNode.id, "/file_name", fileName.toByteArray()).await()
+                    
+                    kotlinx.coroutines.delay(500)
 
-                // الانتظار ثانية واحدة للسماح للساعة بمعالجة الاسم
-                kotlinx.coroutines.delay(1000)
+                    val channelClient = Wearable.getChannelClient(this@MainActivity)
+                    val channel = channelClient.openChannel(watchNode.id, "/file_channel").await()
 
-                // 3. فتح القناة وإرسال الملف الفعلي
-                val channelClient = Wearable.getChannelClient(this@MainActivity)
-                val channel = channelClient.openChannel(watchNode.id, "/file_channel").await()
+                    val inputStream: InputStream? = contentResolver.openInputStream(uri)
+                    val outputStream: OutputStream = channelClient.getOutputStream(channel).await()
 
-                val inputStream: InputStream? = contentResolver.openInputStream(uri)
-                val outputStream: OutputStream = channelClient.getOutputStream(channel).await()
+                    if (inputStream != null) {
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                        }
 
-                if (inputStream != null) {
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
-                    }
+                        outputStream.flush()
+                        outputStream.close()
+                        inputStream.close()
+                        channelClient.close(channel).await()
 
-                    outputStream.flush()
-                    outputStream.close()
-                    inputStream.close()
-                    channelClient.close(channel).await()
-
-                    runOnUiThread {
-                        Toast.makeText(this@MainActivity, "✅ تم إرسال $fileName للساعة بنجاح!", Toast.LENGTH_LONG).show()
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "✅ تم إرسال $fileName للساعة بنجاح!", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    Toast.makeText(this@MainActivity, "خطأ: ${e.message}", Toast.LENGTH_LONG).show()
+                    // سيظهر لنا الخطأ الفعلي الآن بدلاً من التعليق
+                    Toast.makeText(this@MainActivity, "فشل الإرسال: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -164,8 +163,12 @@ fun WearLoadUI(activity: MainActivity) {
             onClick = { 
                 if (selectedFileUri != null) {
                     isSending = true
+                    // بمجرد انتهاء دالة الإرسال (نجاح أو فشل) سيعود الزر لطبيعته
                     activity.sendApkToWatch(selectedFileUri!!, selectedFileName)
-                    isSending = false
+                    CoroutineScope(Dispatchers.Main).launch {
+                        kotlinx.coroutines.delay(10500) // ننتظر حتى ينتهي المؤقت كحد أقصى
+                        isSending = false
+                    }
                 }
             },
             enabled = selectedFileUri != null && !isSending,
