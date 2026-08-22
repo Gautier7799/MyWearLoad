@@ -3,43 +3,40 @@ package com.gautier.mywearload
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageInstaller
-import com.google.android.gms.tasks.Tasks
+import android.net.Uri
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 
 class WearReceiverService : WearableListenerService() {
     
     override fun onChannelOpened(channel: ChannelClient.Channel) {
         super.onChannelOpened(channel)
         
-        // التحقق من أن القناة صحيحة
         if (channel.path == "/wearload_apk_transfer") {
             try {
+                val apkFile = File(getExternalFilesDir(null), "received_cadran.apk")
+                val uri = Uri.fromFile(apkFile)
+                
                 val channelClient = Wearable.getChannelClient(applicationContext)
                 
-                // ⚠️ هنا قمنا بإلغاء الكوروتين لكي نُجبر الساعة على انتظار الملف كاملاً
-                val inputStream = Tasks.await(channelClient.getInputStream(channel))
+                // انتظار انتهاء نقل الملف بأمان
+                channelClient.registerChannelCallback(channel, object : ChannelClient.ChannelCallback() {
+                    override fun onInputClosed(c: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
+                        super.onInputClosed(c, closeReason, appSpecificErrorCode)
+                        
+                        if (closeReason == ChannelClient.ChannelCallback.CLOSE_REASON_NORMAL) {
+                            installApk(apkFile) // تثبيت التطبيق بعد اكتمال النقل
+                        }
+                        
+                        channelClient.unregisterChannelCallback(channel, this)
+                    }
+                })
                 
-                val apkFile = File(cacheDir, "received_cadran.apk")
-                val outputStream = FileOutputStream(apkFile)
-                
-                // استقبال الملف وتجميعه
-                val buffer = ByteArray(8 * 1024)
-                var bytes = inputStream.read(buffer)
-                while (bytes >= 0) {
-                    outputStream.write(buffer, 0, bytes)
-                    bytes = inputStream.read(buffer)
-                }
-                
-                inputStream.close()
-                outputStream.close()
-                
-                // إظهار نافذة التثبيت
-                installApk(apkFile)
+                // استقبال الملف بالطريقة الرسمية من جوجل
+                channelClient.receiveFile(channel, uri, false)
                 
             } catch (e: Exception) {
                 e.printStackTrace()
