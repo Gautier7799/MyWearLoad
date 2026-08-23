@@ -10,10 +10,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
@@ -27,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,7 +46,7 @@ class MainActivity : ComponentActivity() {
             
             MaterialTheme { 
                 Surface(modifier = Modifier.fillMaxSize(), color = darkBg) { 
-                    WearModernUI(this, buttonOffBg, buttonOnBg) 
+                    WearModernUI(this, darkBg, buttonOffBg, buttonOnBg) 
                 } 
             }
         }
@@ -66,15 +70,43 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
+fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor: Color) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
     var selectedFileSize by remember { mutableLongStateOf(1L) }
     var processStatus by remember { mutableStateOf("") }
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
+    
+    // متغيرات القائمة
+    var showFacesList by remember { mutableStateOf(false) }
+    var isFetchingList by remember { mutableStateOf(false) }
+    var facesList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    
     val coroutineScope = rememberCoroutineScope()
     
+    DisposableEffect(Unit) {
+        val messageClient = Wearable.getMessageClient(activity)
+        val listener = MessageClient.OnMessageReceivedListener { event ->
+            if (event.path == "/installed_faces_list") {
+                val dataString = String(event.data)
+                if (dataString == "EMPTY") {
+                    facesList = emptyList()
+                } else if (dataString.isNotEmpty()) {
+                    val items = dataString.split(";;;")
+                    facesList = items.mapNotNull { 
+                        val parts = it.split("|")
+                        if (parts.size == 2) Pair(parts[0], parts[1]) else null
+                    }
+                }
+                isFetchingList = false
+                showFacesList = true
+            }
+        }
+        messageClient.addListener(listener)
+        onDispose { messageClient.removeListener(listener) }
+    }
+
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             selectedFileUri = uri
@@ -148,12 +180,33 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
+            // 🔥 تعديل الزر هنا ليعمل مباشرة بدون شروط معقدة 🔥
             IconButton(
-                onClick = { },
+                onClick = {
+                    isFetchingList = true
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            val nodes = Tasks.await(Wearable.getNodeClient(activity).connectedNodes)
+                            val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
+                            if (watchNode != null) {
+                                Wearable.getMessageClient(activity).sendMessage(watchNode.id, "/request_installed_faces", ByteArray(0))
+                            } else {
+                                isFetchingList = false
+                            }
+                        } catch (e: Exception) { 
+                            isFetchingList = false 
+                        }
+                    }
+                },
                 modifier = Modifier.size(64.dp).background(offColor, CircleShape)
             ) {
-                Icon(Icons.Filled.List, contentDescription = "History", tint = Color.LightGray, modifier = Modifier.size(32.dp))
+                if (isFetchingList) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.List, contentDescription = "History", tint = Color.LightGray, modifier = Modifier.size(32.dp))
+                }
             }
+            
             IconButton(
                 onClick = { },
                 modifier = Modifier.size(64.dp).background(offColor, CircleShape)
@@ -167,6 +220,51 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
                 Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.LightGray, modifier = Modifier.size(32.dp))
             }
         }
+    }
+
+    if (showFacesList) {
+        AlertDialog(
+            onDismissRequest = { showFacesList = false },
+            title = { Text("التطبيقات و الواجهات", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                if (facesList.isEmpty()) {
+                    Text("لا توجد واجهات مثبتة يدوياً.", color = Color.LightGray)
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxHeight(0.6f)) {
+                        items(facesList) { face ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(face.first, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(face.second, color = Color.Gray, fontSize = 10.sp)
+                                }
+                                IconButton(onClick = {
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        val nodes = Tasks.await(Wearable.getNodeClient(activity).connectedNodes)
+                                        val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
+                                        if (watchNode != null) {
+                                            Wearable.getMessageClient(activity).sendMessage(watchNode.id, "/uninstall_face", face.second.toByteArray())
+                                        }
+                                    }
+                                    showFacesList = false
+                                }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFEA4335))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFacesList = false }) {
+                    Text("إغلاق", color = onColor, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = darkBg
+        )
     }
 }
 
