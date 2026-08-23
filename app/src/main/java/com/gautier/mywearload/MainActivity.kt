@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -76,30 +77,31 @@ class MainActivity : ComponentActivity() {
                         var bytesRead: Int
                         
                         try {
+                            // الاستمرار في القراءة حتى ينتهي الملف
                             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                                 outputStream.write(buffer, 0, bytesRead)
                                 totalBytes += bytesRead
                                 watchReceivedMegabytes = (totalBytes.toFloat() / (1024f * 1024f))
                             }
                         } catch (e: Exception) {
-                            // نتجاهل خطأ انقطاع الاتصال هنا، لأننا سنفحص الملف في الخطوة التالية
+                            // إذا أغلق الهاتف القناة، سيعتبر الكود أن النقل انتهى ونتجاهل خطأ القراءة
                         } finally {
                             outputStream.close()
                             inputStream.close()
                             channelClient.close(channel)
                         }
 
-                        // 🔥 الفاحص الذكي: يتأكد هل الملف الذي وصل هو تطبيق سليم أم تالف؟
+                        // 🔥 الفاحص الذكي: يتأكد هل الملف الذي وصل هو تطبيق APK سليم؟
                         val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
                         
                         if (packageInfo != null) {
-                            // الملف سليم 100% (تجاهل أي إنذار كاذب بانقطاع الاتصال)
+                            // الملف سليم 100% ومكتمل
                             watchIsReceiving = false
                             watchIsSuccess = true
-                            watchReceiveStatus = "تم الاستلام بنجاح!\nجاري بدء التثبيت..."
+                            watchReceiveStatus = "تم الاستلام بنجاح!\nجاري فتح التثبيت..."
                             installApk(apkFile)
                         } else {
-                            // الملف تالف فعلاً أو لم يكتمل
+                            // الملف تالف فعلاً أو مقطوع
                             watchIsReceiving = false
                             watchIsSuccess = false
                             watchReceiveStatus = "الملف غير مكتمل، أعد الإرسال"
@@ -108,23 +110,23 @@ class MainActivity : ComponentActivity() {
                     } catch (e: Exception) {
                         watchIsReceiving = false
                         watchIsSuccess = false
-                        watchReceiveStatus = "حدث خطأ تقني في الاتصال"
+                        watchReceiveStatus = "حدث خطأ في الاتصال"
                     }
                 }
             }
         }
 
         override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
-            if (watchIsReceiving) {
-                watchIsReceiving = false
-                watchReceiveStatus = "تم قطع الاتصال"
-            }
+            // تم إلغاء تغيير الحالة هنا لمنع أي إنذار كاذب عند إغلاق الاتصال السليم
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // 🔥 السر هنا: منع الشاشة من الانطفاء نهائياً أثناء عمل التطبيق 🔥
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
         if (isWatch) {
             Wearable.getChannelClient(this).registerChannelCallback(channelCallback)
@@ -231,7 +233,7 @@ fun WatchModernUI(activity: MainActivity) {
                 Text(String.format("%.1f MB", activity.watchReceivedMegabytes), fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
             } else if (activity.watchIsSuccess) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = Color(0xFF34A853), modifier = Modifier.size(48.dp))
-            } else if (activity.watchReceiveStatus.contains("خطأ") || activity.watchReceiveStatus.contains("قطع") || activity.watchReceiveStatus.contains("مكتمل")) {
+            } else if (activity.watchReceiveStatus.contains("خطأ") || activity.watchReceiveStatus.contains("مكتمل")) {
                 Icon(Icons.Filled.Warning, contentDescription = "Error", tint = Color(0xFFEA4335), modifier = Modifier.size(48.dp))
             } else {
                 Box(modifier = Modifier.size(48.dp).background(Color(0xFF2C3E48), CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
@@ -313,7 +315,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.2", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.3", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -509,8 +511,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                 }
                 outputStream.flush()
                 
-                // 🔥 إعطاء الساعة وقت إضافي (2 ثانية) لاستيعاب آخر بايت من الملف قبل إغلاق القناة
-                delay(2000) 
+                delay(1000) // إعطاء مساحة زمنية للساعة لتنتهي من معالجة البايت الأخير
                 
                 inputStream.close(); outputStream.close(); channelClient.close(channel)
                 onProgressUpdate(1f)
