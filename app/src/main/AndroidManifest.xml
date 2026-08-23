@@ -9,8 +9,11 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     
-    <!-- الصلاحية الجديدة المطلوبة في أندرويد 11+ لرؤية قائمة الواجهات المثبتة -->
+    <!-- الصلاحية المطلوبة في أندرويد 11+ لرؤية قائمة الواجهات المثبتة -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <!-- 🔥 الصلاحية الجديدة المطلوبة للإنترنت (لتحميل الواجهات من المتجر) 🔥 -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -32,7 +35,7 @@
             android:name=".WearReceiverService"
             android:exported="true">
             
-            <!-- 🔥 استقبال الملفات + استقبال الرسائل في نفس المكان 🔥 -->
+            <!-- استقبال الملفات + استقبال الرسائل في نفس المكان -->
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
