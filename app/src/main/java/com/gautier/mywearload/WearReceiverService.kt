@@ -6,6 +6,7 @@ import android.content.pm.PackageInstaller
 import android.os.PowerManager
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import java.io.File
@@ -14,26 +15,60 @@ import java.io.FileOutputStream
 
 class WearReceiverService : WearableListenerService() {
 
-    // 🔥 هذا الجزء هو الذي سيستقبل طلب التثبيت ويجبر شاشة الساعة على الاستيقاظ 🔥
+    // 🔥 استقبال الرسائل السريعة (طلب القائمة أو أمر الحذف) 🔥
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        super.onMessageReceived(messageEvent)
+        
+        when (messageEvent.path) {
+            "/request_installed_faces" -> {
+                val pm = packageManager
+                val packages = pm.getInstalledPackages(0)
+                val facesList = mutableListOf<String>()
+                
+                for (pack in packages) {
+                    // نجلب فقط التطبيقات التي ثبتها المستخدم (نتجاهل تطبيقات نظام الساعة الأساسية)
+                    val isSystemApp = (pack.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                    if (!isSystemApp && pack.packageName != packageName) {
+                        val appName = pack.applicationInfo.loadLabel(pm).toString()
+                        facesList.add("$appName|${pack.packageName}")
+                    }
+                }
+                
+                val payload = facesList.joinToString(";;;").toByteArray()
+                Wearable.getMessageClient(this).sendMessage(messageEvent.sourceNodeId, "/installed_faces_list", payload)
+            }
+            "/uninstall_face" -> {
+                val packageToUninstall = String(messageEvent.data)
+                
+                // إيقاظ الشاشة لتأكيد الحذف
+                val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+                @Suppress("DEPRECATION")
+                val wakeLock = powerManager.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE, "WearLoad::UninstallWakeUp")
+                wakeLock.acquire(3000)
+
+                // فتح نافذة الحذف الرسمية من نظام الساعة
+                val intent = Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$packageToUninstall"))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            }
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "com.gautier.mywearload.INSTALL_CONFIRM") {
             val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)
             
-            // إذا كان النظام يطلب موافقة المستخدم
             if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                 val confirmationIntent = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
                 if (confirmationIntent != null) {
-                    
-                    // إيقاظ الشاشة رغماً عنها (Wake Up)
                     val powerManager = getSystemService(POWER_SERVICE) as PowerManager
                     @Suppress("DEPRECATION")
                     val wakeLock = powerManager.newWakeLock(
                         PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                         "WearLoad::InstallWakeUp"
                     )
-                    wakeLock.acquire(3000) // إضاءة الشاشة لمدة 3 ثوانٍ
+                    wakeLock.acquire(3000)
 
-                    // فتح نافذة التثبيت
                     confirmationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     startActivity(confirmationIntent)
                 }
@@ -101,14 +136,11 @@ class WearReceiverService : WearableListenerService() {
             input.close()
             out.close()
 
-            // 🔥 توجيه رسالة التثبيت لنفس الخدمة (استخدمنا FLAG_MUTABLE ليتمكن النظام من إرفاق نافذة التثبيت) 🔥
             val intent = Intent(this, WearReceiverService::class.java).apply {
                 action = "com.gautier.mywearload.INSTALL_CONFIRM"
             }
             val pendingIntent = PendingIntent.getService(
-                this, 
-                0, 
-                intent, 
+                this, 0, intent, 
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
             
