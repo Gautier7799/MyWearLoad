@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -288,11 +289,10 @@ fun WatchModernUI(activity: MainActivity) {
 }
 
 // ==========================================
-// تصميم شاشة الهاتف (V5.5)
+// تصميم شاشة الهاتف (V5.6)
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
-// 👉 السطر السحري لحل مشكلة الخطأ 👈
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WearModernUI(
@@ -311,6 +311,7 @@ fun WearModernUI(
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedFacePreview by remember { mutableStateOf<StoreFace?>(null) } // متغير لعرض الصورة المكبرة
     
     val coroutineScope = rememberCoroutineScope()
     
@@ -333,7 +334,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.5", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.6", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -387,7 +388,13 @@ fun WearModernUI(
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(storeFaces) { face ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).background(offColor, RoundedCornerShape(16.dp)).padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(offColor)
+                                .clickable { selectedFacePreview = face } // عند الضغط سيفتح الصورة المكبرة
+                                .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AsyncImage(
@@ -456,6 +463,52 @@ fun WearModernUI(
                 Text("جاهز للاستخدام", color = Color.Gray, fontSize = 12.sp)
             }
         }
+    }
+
+    // نافذة التكبير وعرض تفاصيل الساعة
+    if (selectedFacePreview != null) {
+        AlertDialog(
+            onDismissRequest = { selectedFacePreview = null },
+            containerColor = offColor,
+            title = { Text(selectedFacePreview!!.name, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = selectedFacePreview!!.imageUrl,
+                        contentDescription = "Preview",
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clip(CircleShape)
+                            .background(Color.DarkGray)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("المطور: ${selectedFacePreview!!.author}", color = Color.LightGray, fontSize = 16.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val face = selectedFacePreview!!
+                        selectedFacePreview = null // إغلاق النافذة
+                        if (!isSending) {
+                            coroutineScope.launch {
+                                isSending = true; transferProgress = 0f
+                                val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
+                                if (downloadedUri != null) {
+                                    transferProgress = 0f
+                                    sendApkWithProgress(activity, downloadedUri, File(downloadedUri.path!!).length(), { transferProgress = it }, { processStatus = it })
+                                }
+                                isSending = false
+                            }
+                        }
+                    }, 
+                    colors = ButtonDefaults.buttonColors(containerColor = onColor)
+                ) { Text("تحميل وإرسال", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedFacePreview = null }) { Text("إغلاق", color = Color.LightGray) }
+            }
+        )
     }
 
     if (showAddDialog) {
