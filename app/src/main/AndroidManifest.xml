@@ -2,12 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.gautier.mywearload">
 
-    <!-- الصلاحيات المطلوبة -->
+    <!-- الصلاحيات المطلوبة الأساسية -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    
+    <!-- 🔥 الصلاحية الجديدة المطلوبة في أندرويد 11+ لرؤية قائمة الواجهات المثبتة 🔥 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
         android:allowBackup="true"
@@ -33,7 +36,7 @@
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
             </intent-filter>
             
-            <!-- 🔥 السماح للساعة باستقبال الرسائل السريعة (مثل طلب القائمة وأمر الحذف) 🔥 -->
+            <!-- السماح للساعة باستقبال الرسائل السريعة (مثل طلب القائمة وأمر الحذف) -->
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/" />
