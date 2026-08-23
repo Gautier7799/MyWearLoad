@@ -34,6 +34,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,8 +75,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// نموذج بيانات الواجهة في المتجر
-data class StoreFace(val id: String, val name: String, val author: String, val iconColor: Color)
+data class StoreFace(val id: String, val name: String, val author: String, val iconColor: Color, val downloadUrl: String)
 
 @Composable
 fun WearModernUI(
@@ -82,7 +86,7 @@ fun WearModernUI(
     materialYouColor: Color,
     materialYouIcon: Color
 ) {
-    var currentTab by remember { mutableStateOf("LOCAL") } // LOCAL أو STORE
+    var currentTab by remember { mutableStateOf("LOCAL") }
     
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
@@ -98,12 +102,12 @@ fun WearModernUI(
     
     val coroutineScope = rememberCoroutineScope()
     
-    // قائمة تجريبية للمتجر (سنقوم بربطها بروابط حقيقية لاحقاً)
+    // هذه هي الروابط التي سيحاول التطبيق تحميلها من الإنترنت (حاليا وهمية للتجربة)
     val storeFaces = listOf(
-        StoreFace("1", "Casio Retro", "Classic Design", Color(0xFFE53935)),
-        StoreFace("2", "Neon Cyberpunk", "Futuristic Studio", Color(0xFF8E24AA)),
-        StoreFace("3", "Minimal White", "Clean Looks", Color(0xFF3949AB)),
-        StoreFace("4", "Sport Dashboard", "Fitness Track", Color(0xFF43A047))
+        StoreFace("1", "Casio Retro", "Classic Design", Color(0xFFE53935), "https://example.com/face1.apk"),
+        StoreFace("2", "Neon Cyberpunk", "Futuristic Studio", Color(0xFF8E24AA), "https://example.com/face2.apk"),
+        StoreFace("3", "Minimal White", "Clean Looks", Color(0xFF3949AB), "https://example.com/face3.apk"),
+        StoreFace("4", "Sport Dashboard", "Fitness Track", Color(0xFF43A047), "https://example.com/face4.apk")
     )
 
     DisposableEffect(Unit) {
@@ -145,10 +149,9 @@ fun WearModernUI(
         
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V3", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V4", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
-        // نظام التبويبات (Tabs)
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Button(
                 onClick = { currentTab = "LOCAL" },
@@ -211,7 +214,6 @@ fun WearModernUI(
                 Spacer(modifier = Modifier.weight(1f))
             }
         } else {
-            // شاشة المتجر (Dépôt)
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(storeFaces) { face ->
                     Row(
@@ -236,22 +238,15 @@ fun WearModernUI(
                                     coroutineScope.launch {
                                         isSending = true
                                         transferProgress = 0f
-                                        processStatus = "⬇️ جاري التحميل من السحابة..."
                                         
-                                        // محاكاة التحميل السحابي (Demo)
-                                        for (i in 1..50) {
-                                            delay(40)
-                                            transferProgress = i / 100f
+                                        // الكود الجديد الذي يقوم بالتحميل الحقيقي من الإنترنت
+                                        val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
+                                        
+                                        if (downloadedUri != null) {
+                                            transferProgress = 0f
+                                            val file = File(downloadedUri.path!!)
+                                            sendApkWithProgress(activity, downloadedUri, file.length(), { transferProgress = it }, { processStatus = it })
                                         }
-                                        
-                                        processStatus = "📡 جاري الإرسال للساعة..."
-                                        // محاكاة الإرسال للساعة (Demo)
-                                        for (i in 51..100) {
-                                            delay(30)
-                                            transferProgress = i / 100f
-                                        }
-                                        
-                                        processStatus = "✅ تم إرسال ${face.name} بنجاح!"
                                         isSending = false
                                     }
                                 }
@@ -271,7 +266,6 @@ fun WearModernUI(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // شريط متابعة الإرسال (مشترك بين المحلي والمتجر)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -308,7 +302,6 @@ fun WearModernUI(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // الأزرار السفلية
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), 
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -394,6 +387,50 @@ fun WearModernUI(
             confirmButton = { TextButton(onClick = { showFacesList = false }) { Text("إغلاق", color = onColor, fontWeight = FontWeight.Bold) } },
             containerColor = darkBg
         )
+    }
+}
+
+suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
+    return withContext(Dispatchers.IO) {
+        try {
+            onStatusUpdate("⬇️ جاري التحميل من السحابة...")
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.connect()
+
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                onStatusUpdate("❌ الرابط غير صالح (Demo)")
+                return@withContext null
+            }
+
+            val fileLength = connection.contentLength
+            val input = BufferedInputStream(url.openStream())
+            val tempFile = File(context.cacheDir, "temp_face.apk")
+            if (tempFile.exists()) tempFile.delete()
+            
+            val output = FileOutputStream(tempFile)
+            val data = ByteArray(8 * 1024)
+            var total = 0L
+            var count: Int
+            
+            while (input.read(data).also { count = it } != -1) {
+                total += count.toLong()
+                if (fileLength > 0) {
+                    onProgressUpdate(total.toFloat() / fileLength.toFloat())
+                }
+                output.write(data, 0, count)
+            }
+            output.flush()
+            output.close()
+            input.close()
+            
+            Uri.fromFile(tempFile)
+        } catch (e: Exception) {
+            onStatusUpdate("❌ خطأ: تأكد من روابط الـ APK")
+            null
+        }
     }
 }
 
