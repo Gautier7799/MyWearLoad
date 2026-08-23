@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     
-    <!-- 🔥 الصلاحية الجديدة المطلوبة في أندرويد 11+ لرؤية قائمة الواجهات المثبتة 🔥 -->
+    <!-- الصلاحية الجديدة المطلوبة في أندرويد 11+ لرؤية قائمة الواجهات المثبتة -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
@@ -31,16 +31,14 @@
         <service
             android:name=".WearReceiverService"
             android:exported="true">
-            <!-- الاستماع لنقل الملفات -->
+            
+            <!-- 🔥 استقبال الملفات + استقبال الرسائل في نفس المكان 🔥 -->
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
-            </intent-filter>
-            
-            <!-- السماح للساعة باستقبال الرسائل السريعة (مثل طلب القائمة وأمر الحذف) -->
-            <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/" />
             </intent-filter>
+
         </service>
 
     </application>
