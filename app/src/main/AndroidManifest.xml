@@ -5,6 +5,9 @@
     <!-- الصلاحيات المطلوبة -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 🚨 الإذن الجديد المطلوب لإجبار نافذة التثبيت على الظهور 🚨 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -12,7 +15,6 @@
         android:label="My WearLoad"
         android:supportsRtl="true">
 
-        <!-- واجهة التطبيق الرئيسية -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -23,7 +25,6 @@
             </intent-filter>
         </activity>
 
-        <!-- خدمة استقبال الملفات للساعة (تمنع انقطاع الاتصال) -->
         <service
             android:name=".WearReceiverService"
             android:exported="true">
