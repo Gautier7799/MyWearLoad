@@ -15,40 +15,56 @@ import java.io.FileOutputStream
 
 class WearReceiverService : WearableListenerService() {
 
-    // 🔥 استقبال الرسائل السريعة (طلب القائمة أو أمر الحذف) 🔥
     override fun onMessageReceived(messageEvent: MessageEvent) {
         super.onMessageReceived(messageEvent)
         
         when (messageEvent.path) {
             "/request_installed_faces" -> {
-                val pm = packageManager
-                val packages = pm.getInstalledPackages(0)
-                val facesList = mutableListOf<String>()
-                
-                for (pack in packages) {
-                    // نجلب فقط التطبيقات التي ثبتها المستخدم (نتجاهل تطبيقات نظام الساعة الأساسية)
-                    val isSystemApp = (pack.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
-                    if (!isSystemApp && pack.packageName != packageName) {
-                        val appName = pack.applicationInfo.loadLabel(pm).toString()
-                        facesList.add("$appName|${pack.packageName}")
+                Thread {
+                    try {
+                        val pm = packageManager
+                        val packages = pm.getInstalledPackages(0)
+                        val facesList = mutableListOf<String>()
+                        
+                        for (pack in packages) {
+                            val isSystemApp = (pack.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                            if (!isSystemApp && pack.packageName != packageName) {
+                                val appName = pack.applicationInfo.loadLabel(pm).toString()
+                                facesList.add("$appName|${pack.packageName}")
+                            }
+                        }
+                        
+                        val payload = if (facesList.isNotEmpty()) {
+                            facesList.joinToString(";;;").toByteArray()
+                        } else {
+                            "EMPTY".toByteArray()
+                        }
+
+                        Wearable.getMessageClient(this@WearReceiverService).sendMessage(
+                            messageEvent.sourceNodeId, 
+                            "/installed_faces_list", 
+                            payload
+                        )
+                    } catch (e: Exception) {
+                        val errorMsg = "ERROR|${e.message}"
+                        Wearable.getMessageClient(this@WearReceiverService).sendMessage(
+                            messageEvent.sourceNodeId, 
+                            "/installed_faces_list", 
+                            errorMsg.toByteArray()
+                        )
                     }
-                }
-                
-                val payload = facesList.joinToString(";;;").toByteArray()
-                Wearable.getMessageClient(this).sendMessage(messageEvent.sourceNodeId, "/installed_faces_list", payload)
+                }.start()
             }
             "/uninstall_face" -> {
                 val packageToUninstall = String(messageEvent.data)
                 
-                // إيقاظ الشاشة لتأكيد الحذف
                 val powerManager = getSystemService(POWER_SERVICE) as PowerManager
                 @Suppress("DEPRECATION")
                 val wakeLock = powerManager.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE, "WearLoad::UninstallWakeUp")
                 wakeLock.acquire(3000)
 
-                // فتح نافذة الحذف الرسمية من نظام الساعة
                 val intent = Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$packageToUninstall"))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 startActivity(intent)
             }
         }
