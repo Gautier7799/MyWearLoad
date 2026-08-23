@@ -102,11 +102,11 @@ fun WearModernUI(
     
     val coroutineScope = rememberCoroutineScope()
     
-    // 🔥 روابط حقيقية 100% تعمل الآن لتطبيقات Wear OS مفتوحة المصدر صغيرة الحجم 🔥
+    // 🔥 استخدمت روابط حقيقية ومضمونة 100% للتجربة (حجمها حوالي 8 ميجا لنرى التحميل) 🔥
     val storeFaces = listOf(
-        StoreFace("1", "WearOS Torch", "مصباح للساعة", Color(0xFFE53935), "https://github.com/mikes222/wear-torch/releases/download/v1.0/wear-torch-1.0.apk"),
-        StoreFace("2", "Wear 2048", "لعبة 2048", Color(0xFF8E24AA), "https://github.com/Kestutis-Z/2048-Wear/releases/download/1.0/app-release.apk"),
-        StoreFace("3", "Wear Timer", "مؤقت رياضي", Color(0xFF3949AB), "https://github.com/TheTimeApp/TimerWear/releases/download/1.0/app-release.apk")
+        StoreFace("1", "App Test 1", "F-Droid Store", Color(0xFFE53935), "https://f-droid.org/F-Droid.apk"),
+        StoreFace("2", "App Test 2", "F-Droid Store", Color(0xFF8E24AA), "https://f-droid.org/F-Droid.apk"),
+        StoreFace("3", "App Test 3", "F-Droid Store", Color(0xFF3949AB), "https://f-droid.org/F-Droid.apk")
     )
 
     DisposableEffect(Unit) {
@@ -148,7 +148,7 @@ fun WearModernUI(
         
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V4.1", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V4.2", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -388,43 +388,52 @@ fun WearModernUI(
     }
 }
 
+// 🔥 دالة التحميل الذكية التي تتخطى الروابط المعقدة وتعطي الخطأ الفعلي 🔥
 suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
     return withContext(Dispatchers.IO) {
         try {
-            onStatusUpdate("⬇️ جاري التحميل من السحابة...")
-            val url = URL(urlString)
-            val connection = url.openConnection() as HttpURLConnection
-            
-            // إضافة خصائص لمنع مشاكل التحميل من Github
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-            connection.instanceFollowRedirects = true
-            
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
-            connection.connect()
+            onStatusUpdate("⬇️ جاري الاتصال بالسيرفر...")
+            var url = URL(urlString)
+            var connection = url.openConnection() as HttpURLConnection
+            var redirectCount = 0
+            var responseCode: Int
 
-            var responseCode = connection.responseCode
-            var redirectUrl = urlString
-            
-            // معالجة توجيه الروابط (Redirects) لأن Github Raw يستخدمها
-            if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == HttpURLConnection.HTTP_SEE_OTHER) {
-                redirectUrl = connection.getHeaderField("Location")
-                val newConn = URL(redirectUrl).openConnection() as HttpURLConnection
-                newConn.setRequestProperty("User-Agent", "Mozilla/5.0")
-                newConn.connect()
-                responseCode = newConn.responseCode
+            // حلقة للتعامل مع إعادة التوجيه (Redirects)
+            while (true) {
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.instanceFollowRedirects = false 
+                connection.connect()
+
+                responseCode = connection.responseCode
+                if (responseCode in 300..399) {
+                    val redirectUrl = connection.getHeaderField("Location")
+                    connection.disconnect()
+                    url = URL(redirectUrl)
+                    connection = url.openConnection() as HttpURLConnection
+                    redirectCount++
+                    if (redirectCount > 5) {
+                        onStatusUpdate("❌ خطأ: تحويلات السيرفر كثيرة")
+                        return@withContext null
+                    }
+                } else {
+                    break
+                }
             }
 
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                onStatusUpdate("❌ الرابط غير صالح (Demo)")
+            // فحص الخطأ وطباعته
+            if (responseCode == 404) {
+                onStatusUpdate("❌ الملف غير موجود بالرابط (404)")
+                return@withContext null
+            } else if (responseCode != HttpURLConnection.HTTP_OK) {
+                onStatusUpdate("❌ خطأ في السيرفر: Code $responseCode")
                 return@withContext null
             }
 
-            // استخدام الاتصال الصحيح (سواء الأصلي أو بعد التوجيه)
-            val finalConn = URL(redirectUrl).openConnection() as HttpURLConnection
-            finalConn.setRequestProperty("User-Agent", "Mozilla/5.0")
-            val fileLength = finalConn.contentLength
-            val input = BufferedInputStream(finalConn.inputStream)
+            onStatusUpdate("⬇️ جاري التحميل من السحابة...")
+            val fileLength = connection.contentLength
+            val input = BufferedInputStream(connection.inputStream)
             
             val tempFile = File(context.cacheDir, "temp_face.apk")
             if (tempFile.exists()) tempFile.delete()
@@ -447,7 +456,7 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
             
             Uri.fromFile(tempFile)
         } catch (e: Exception) {
-            onStatusUpdate("❌ خطأ: ${e.message}")
+            onStatusUpdate("❌ خطأ بالاتصال: ${e.message}")
             null
         }
     }
@@ -456,10 +465,10 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
 suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
-            onStatusUpdate("🔍 جاري الاتصال...")
+            onStatusUpdate("🔍 جاري الاتصال بالساعة...")
             val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
             val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
-            if (watchNode == null) { onStatusUpdate("❌ فشل: تأكد من تشغيل البلوتوث!"); return@withContext }
+            if (watchNode == null) { onStatusUpdate("❌ فشل: تأكد من تشغيل البلوتوث وربط الساعة!"); return@withContext }
             
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
@@ -468,7 +477,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
             val outputStream = Tasks.await(channelClient.getOutputStream(channel))
             
             if (inputStream != null && outputStream != null) {
-                onStatusUpdate("📡 جاري النقل (يمكنك إغلاق شاشة الساعة)...")
+                onStatusUpdate("📡 جاري الإرسال للساعة...")
                 val buffer = ByteArray(8 * 1024)
                 var bytesCopied = 0L
                 var bytes = inputStream.read(buffer)
@@ -480,7 +489,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                 }
                 inputStream.close(); outputStream.close(); channelClient.close(channel)
                 onProgressUpdate(1f)
-                onStatusUpdate("✅ تم الإرسال! وافق على التثبيت في ساعتك.")
+                onStatusUpdate("✅ تم الإرسال بنجاح! وافق على التثبيت في ساعتك.")
             }
         } catch (e: Exception) { onStatusUpdate("❌ خطأ تقني: ${e.message}") }
     }
