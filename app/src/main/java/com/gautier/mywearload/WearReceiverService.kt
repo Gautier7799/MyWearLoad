@@ -13,7 +13,35 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 class WearReceiverService : WearableListenerService() {
-    
+
+    // 🔥 هذا الجزء هو الذي سيستقبل طلب التثبيت ويجبر شاشة الساعة على الاستيقاظ 🔥
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "com.gautier.mywearload.INSTALL_CONFIRM") {
+            val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)
+            
+            // إذا كان النظام يطلب موافقة المستخدم
+            if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                val confirmationIntent = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                if (confirmationIntent != null) {
+                    
+                    // إيقاظ الشاشة رغماً عنها (Wake Up)
+                    val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+                    @Suppress("DEPRECATION")
+                    val wakeLock = powerManager.newWakeLock(
+                        PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                        "WearLoad::InstallWakeUp"
+                    )
+                    wakeLock.acquire(3000) // إضاءة الشاشة لمدة 3 ثوانٍ
+
+                    // فتح نافذة التثبيت
+                    confirmationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    startActivity(confirmationIntent)
+                }
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun onChannelOpened(channel: ChannelClient.Channel) {
         super.onChannelOpened(channel)
         
@@ -73,17 +101,15 @@ class WearReceiverService : WearableListenerService() {
             input.close()
             out.close()
 
-            // 🔥 دمجنا كود إيقاظ الشاشة وفتح نافذة التثبيت هنا مباشرة 🔥
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("force_show_install", true)
+            // 🔥 توجيه رسالة التثبيت لنفس الخدمة (استخدمنا FLAG_MUTABLE ليتمكن النظام من إرفاق نافذة التثبيت) 🔥
+            val intent = Intent(this, WearReceiverService::class.java).apply {
+                action = "com.gautier.mywearload.INSTALL_CONFIRM"
             }
-            
-            val pendingIntent = PendingIntent.getActivity(
+            val pendingIntent = PendingIntent.getService(
                 this, 
                 0, 
                 intent, 
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
             
             session.commit(pendingIntent.intentSender)
