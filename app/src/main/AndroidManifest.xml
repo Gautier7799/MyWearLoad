@@ -1,48 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.gautier.mywearload">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- الصلاحيات المطلوبة الأساسية -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-    
-    <!-- الصلاحية المطلوبة في أندرويد 11+ لرؤية قائمة الواجهات المثبتة -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-
-    <!-- 🔥 الصلاحية الجديدة المطلوبة للإنترنت (لتحميل الواجهات من المتجر) 🔥 -->
+    <!-- صلاحية الإنترنت لعرض الصور والتحميل من المتجر -->
     <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- صلاحية تثبيت التطبيقات (مهمة جداً لعملية تثبيت الواجهة) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:label="My WearLoad"
-        android:supportsRtl="true">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <service
-            android:name=".WearReceiverService"
-            android:exported="true">
-            
-            <!-- استقبال الملفات + استقبال الرسائل في نفس المكان -->
-            <intent-filter>
-                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/" />
-            </intent-filter>
-
-        </service>
-
     </application>
+
 </manifest>
