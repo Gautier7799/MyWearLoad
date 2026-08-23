@@ -259,7 +259,6 @@ fun WatchModernUI(activity: MainActivity) {
             Spacer(modifier = Modifier.height(12.dp))
 
             if (activity.watchIsReceiving) {
-                // تم إزالة trackColor ليتوافق مع الإصدارات الأقدم
                 CircularProgressIndicator(
                     modifier = Modifier.size(48.dp),
                     color = Color(0xFF3B82F6),
@@ -293,6 +292,8 @@ fun WatchModernUI(activity: MainActivity) {
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
+// 👉 السطر السحري لحل مشكلة الخطأ 👈
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WearModernUI(
     activity: MainActivity, 
@@ -469,7 +470,6 @@ fun WearModernUI(
             title = { Text("إضافة واجهة جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    // تم تبسيط الكود ليكون متوافقاً مع كل الإصدارات
                     OutlinedTextField(
                         value = newName, 
                         onValueChange = { newName = it }, 
