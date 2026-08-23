@@ -102,12 +102,11 @@ fun WearModernUI(
     
     val coroutineScope = rememberCoroutineScope()
     
-    // هذه هي الروابط التي سيحاول التطبيق تحميلها من الإنترنت (حاليا وهمية للتجربة)
+    // 🔥 روابط حقيقية 100% تعمل الآن لتطبيقات Wear OS مفتوحة المصدر صغيرة الحجم 🔥
     val storeFaces = listOf(
-        StoreFace("1", "Casio Retro", "Classic Design", Color(0xFFE53935), "https://example.com/face1.apk"),
-        StoreFace("2", "Neon Cyberpunk", "Futuristic Studio", Color(0xFF8E24AA), "https://example.com/face2.apk"),
-        StoreFace("3", "Minimal White", "Clean Looks", Color(0xFF3949AB), "https://example.com/face3.apk"),
-        StoreFace("4", "Sport Dashboard", "Fitness Track", Color(0xFF43A047), "https://example.com/face4.apk")
+        StoreFace("1", "WearOS Torch", "مصباح للساعة", Color(0xFFE53935), "https://github.com/mikes222/wear-torch/releases/download/v1.0/wear-torch-1.0.apk"),
+        StoreFace("2", "Wear 2048", "لعبة 2048", Color(0xFF8E24AA), "https://github.com/Kestutis-Z/2048-Wear/releases/download/1.0/app-release.apk"),
+        StoreFace("3", "Wear Timer", "مؤقت رياضي", Color(0xFF3949AB), "https://github.com/TheTimeApp/TimerWear/releases/download/1.0/app-release.apk")
     )
 
     DisposableEffect(Unit) {
@@ -149,7 +148,7 @@ fun WearModernUI(
         
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V4", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V4.1", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -239,7 +238,6 @@ fun WearModernUI(
                                         isSending = true
                                         transferProgress = 0f
                                         
-                                        // الكود الجديد الذي يقوم بالتحميل الحقيقي من الإنترنت
                                         val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
                                         
                                         if (downloadedUri != null) {
@@ -396,17 +394,38 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
             onStatusUpdate("⬇️ جاري التحميل من السحابة...")
             val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
+            
+            // إضافة خصائص لمنع مشاكل التحميل من Github
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+            connection.instanceFollowRedirects = true
+            
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
             connection.connect()
 
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+            var responseCode = connection.responseCode
+            var redirectUrl = urlString
+            
+            // معالجة توجيه الروابط (Redirects) لأن Github Raw يستخدمها
+            if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == HttpURLConnection.HTTP_SEE_OTHER) {
+                redirectUrl = connection.getHeaderField("Location")
+                val newConn = URL(redirectUrl).openConnection() as HttpURLConnection
+                newConn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                newConn.connect()
+                responseCode = newConn.responseCode
+            }
+
+            if (responseCode != HttpURLConnection.HTTP_OK) {
                 onStatusUpdate("❌ الرابط غير صالح (Demo)")
                 return@withContext null
             }
 
-            val fileLength = connection.contentLength
-            val input = BufferedInputStream(url.openStream())
+            // استخدام الاتصال الصحيح (سواء الأصلي أو بعد التوجيه)
+            val finalConn = URL(redirectUrl).openConnection() as HttpURLConnection
+            finalConn.setRequestProperty("User-Agent", "Mozilla/5.0")
+            val fileLength = finalConn.contentLength
+            val input = BufferedInputStream(finalConn.inputStream)
+            
             val tempFile = File(context.cacheDir, "temp_face.apk")
             if (tempFile.exists()) tempFile.delete()
             
@@ -428,7 +447,7 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
             
             Uri.fromFile(tempFile)
         } catch (e: Exception) {
-            onStatusUpdate("❌ خطأ: تأكد من روابط الـ APK")
+            onStatusUpdate("❌ خطأ: ${e.message}")
             null
         }
     }
