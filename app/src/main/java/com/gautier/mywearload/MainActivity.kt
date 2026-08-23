@@ -33,6 +33,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -78,7 +79,6 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
     
-    // متغيرات القائمة
     var showFacesList by remember { mutableStateOf(false) }
     var isFetchingList by remember { mutableStateOf(false) }
     var facesList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -92,6 +92,8 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
                 val dataString = String(event.data)
                 if (dataString == "EMPTY") {
                     facesList = emptyList()
+                } else if (dataString.startsWith("ERROR|")) {
+                    facesList = listOf(Pair("خطأ في الساعة:", dataString.removePrefix("ERROR|")))
                 } else if (dataString.isNotEmpty()) {
                     val items = dataString.split(";;;")
                     facesList = items.mapNotNull { 
@@ -118,19 +120,14 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 48.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text("Pro Edition", fontSize = 16.sp, color = Color.Gray)
         }
 
         Button(
             onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
-            modifier = Modifier.fillMaxWidth().height(80.dp), 
-            shape = RoundedCornerShape(24.dp), 
-            colors = ButtonDefaults.buttonColors(containerColor = offColor)
+            modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.buttonColors(containerColor = offColor)
         ) {
             Icon(Icons.Filled.Build, contentDescription = "File", tint = Color.LightGray, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.width(16.dp))
@@ -152,9 +149,7 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
                     }
                 }
             }, 
-            enabled = selectedFileUri != null && !isSending, 
-            modifier = Modifier.fillMaxWidth().height(80.dp), 
-            shape = RoundedCornerShape(24.dp), 
+            enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
             colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))
         ) {
             Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(28.dp))
@@ -165,24 +160,12 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
 
         Spacer(modifier = Modifier.weight(1f))
 
-        if (isSending || transferProgress > 0f) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp), color = Color(0xFF34A853), trackColor = offColor)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        }
-        if (processStatus.isNotEmpty()) {
-            Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else Color(0xFF81C995), fontWeight = FontWeight.Medium, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally))
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            // 🔥 تعديل الزر هنا ليعمل مباشرة بدون شروط معقدة 🔥
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            
+            // 🔥 زر القائمة مع نظام التوقف التلقائي 🔥
             IconButton(
                 onClick = {
+                    if (isFetchingList) return@IconButton
                     isFetchingList = true
                     coroutineScope.launch(Dispatchers.IO) {
                         try {
@@ -190,12 +173,17 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
                             val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
                             if (watchNode != null) {
                                 Wearable.getMessageClient(activity).sendMessage(watchNode.id, "/request_installed_faces", ByteArray(0))
+                                
+                                delay(6000) // انتظار 6 ثوانٍ كحد أقصى
+                                if (isFetchingList) {
+                                    isFetchingList = false
+                                    facesList = listOf(Pair("الساعة لا ترد 💤", "الرجاء فتح تطبيق My WearLoad في شاشة الساعة ثم المحاولة مجدداً."))
+                                    showFacesList = true
+                                }
                             } else {
                                 isFetchingList = false
                             }
-                        } catch (e: Exception) { 
-                            isFetchingList = false 
-                        }
+                        } catch (e: Exception) { isFetchingList = false }
                     }
                 },
                 modifier = Modifier.size(64.dp).background(offColor, CircleShape)
@@ -207,16 +195,10 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
                 }
             }
             
-            IconButton(
-                onClick = { },
-                modifier = Modifier.size(64.dp).background(offColor, CircleShape)
-            ) {
+            IconButton(onClick = { }, modifier = Modifier.size(64.dp).background(offColor, CircleShape)) {
                 Icon(Icons.Filled.Star, contentDescription = "Gemini", tint = Color(0xFFFABB05), modifier = Modifier.size(32.dp))
             }
-            IconButton(
-                onClick = { },
-                modifier = Modifier.size(64.dp).background(offColor, CircleShape)
-            ) {
+            IconButton(onClick = { }, modifier = Modifier.size(64.dp).background(offColor, CircleShape)) {
                 Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.LightGray, modifier = Modifier.size(32.dp))
             }
         }
@@ -227,20 +209,14 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
             onDismissRequest = { showFacesList = false },
             title = { Text("التطبيقات و الواجهات", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
-                if (facesList.isEmpty()) {
-                    Text("لا توجد واجهات مثبتة يدوياً.", color = Color.LightGray)
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxHeight(0.6f)) {
-                        items(facesList) { face ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(face.first, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Text(face.second, color = Color.Gray, fontSize = 10.sp)
-                                }
+                LazyColumn(modifier = Modifier.fillMaxHeight(0.6f)) {
+                    items(facesList) { face ->
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(face.first, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(face.second, color = Color.Gray, fontSize = 12.sp)
+                            }
+                            if (face.first != "الساعة لا ترد 💤" && !face.first.startsWith("خطأ")) {
                                 IconButton(onClick = {
                                     coroutineScope.launch(Dispatchers.IO) {
                                         val nodes = Tasks.await(Wearable.getNodeClient(activity).connectedNodes)
@@ -250,19 +226,13 @@ fun WearModernUI(activity: MainActivity, darkBg: Color, offColor: Color, onColor
                                         }
                                     }
                                     showFacesList = false
-                                }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFEA4335))
-                                }
+                                }) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFEA4335)) }
                             }
                         }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showFacesList = false }) {
-                    Text("إغلاق", color = onColor, fontWeight = FontWeight.Bold)
-                }
-            },
+            confirmButton = { TextButton(onClick = { showFacesList = false }) { Text("إغلاق", color = onColor, fontWeight = FontWeight.Bold) } },
             containerColor = darkBg
         )
     }
