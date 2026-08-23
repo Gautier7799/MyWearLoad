@@ -8,11 +8,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,7 +39,12 @@ class MainActivity : ComponentActivity() {
             val darkBg = Color(0xFF19242C)
             val buttonOffBg = Color(0xFF2C3E48)
             val buttonOnBg = Color(0xFF3B82F6)
-            MaterialTheme { Surface(modifier = Modifier.fillMaxSize(), color = darkBg) { WearModernUI(this, buttonOffBg, buttonOnBg) } }
+            
+            MaterialTheme { 
+                Surface(modifier = Modifier.fillMaxSize(), color = darkBg) { 
+                    WearModernUI(this, buttonOffBg, buttonOnBg) 
+                } 
+            }
         }
     }
 
@@ -74,46 +84,88 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("My WearLoad", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text("Pro Edition", fontSize = 16.sp, color = Color.Gray)
-        Spacer(modifier = Modifier.height(48.dp))
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Pro Edition", fontSize = 16.sp, color = Color.Gray)
+        }
 
-        Button(onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.buttonColors(containerColor = offColor)) {
+        Button(
+            onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
+            modifier = Modifier.fillMaxWidth().height(80.dp), 
+            shape = RoundedCornerShape(24.dp), 
+            colors = ButtonDefaults.buttonColors(containerColor = offColor)
+        ) {
             Icon(Icons.Filled.Build, contentDescription = "File", tint = Color.LightGray, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.width(16.dp))
-            Column(horizontalAlignment = Alignment.Start) {
+            Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
                 Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text(if (selectedFileUri == null) "اضغط هنا للبدء" else "جاهز للإرسال", color = Color.LightGray, fontSize = 12.sp)
             }
-            Spacer(modifier = Modifier.weight(1f))
         }
+        
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = { 
-            if (selectedFileUri != null && !isSending) {
-                coroutineScope.launch {
-                    isSending = true; transferProgress = 0f
-                    sendApkWithProgress(activity, selectedFileUri!!, selectedFileSize, { transferProgress = it }, { processStatus = it })
-                    isSending = false
+        Button(
+            onClick = { 
+                if (selectedFileUri != null && !isSending) {
+                    coroutineScope.launch {
+                        isSending = true; transferProgress = 0f
+                        sendApkWithProgress(activity, selectedFileUri!!, selectedFileSize, { transferProgress = it }, { processStatus = it })
+                        isSending = false
+                    }
                 }
-            }
-        }, enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))) {
+            }, 
+            enabled = selectedFileUri != null && !isSending, 
+            modifier = Modifier.fillMaxWidth().height(80.dp), 
+            shape = RoundedCornerShape(24.dp), 
+            colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))
+        ) {
             Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.width(16.dp))
             Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.weight(1f))
         }
-        Spacer(modifier = Modifier.height(32.dp))
+
+        Spacer(modifier = Modifier.weight(1f))
 
         if (isSending || transferProgress > 0f) {
-            LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp), color = Color(0xFF34A853), trackColor = offColor)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp), color = Color(0xFF34A853), trackColor = offColor)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
+            }
         }
-        Spacer(modifier = Modifier.height(16.dp))
         if (processStatus.isNotEmpty()) {
-            Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else Color(0xFF81C995), fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else Color(0xFF81C995), fontWeight = FontWeight.Medium, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally))
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            IconButton(
+                onClick = { },
+                modifier = Modifier.size(64.dp).background(offColor, CircleShape)
+            ) {
+                Icon(Icons.Filled.List, contentDescription = "History", tint = Color.LightGray, modifier = Modifier.size(32.dp))
+            }
+            IconButton(
+                onClick = { },
+                modifier = Modifier.size(64.dp).background(offColor, CircleShape)
+            ) {
+                Icon(Icons.Filled.Star, contentDescription = "Gemini", tint = Color(0xFFFABB05), modifier = Modifier.size(32.dp))
+            }
+            IconButton(
+                onClick = { },
+                modifier = Modifier.size(64.dp).background(offColor, CircleShape)
+            ) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.LightGray, modifier = Modifier.size(32.dp))
+            }
         }
     }
 }
@@ -121,12 +173,11 @@ fun WearModernUI(activity: MainActivity, offColor: Color, onColor: Color) {
 suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
-            onStatusUpdate("🔍 جاري الاتصال بالساعة...")
+            onStatusUpdate("🔍 جاري الاتصال...")
             val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
             val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
             if (watchNode == null) { onStatusUpdate("❌ فشل: تأكد من تشغيل البلوتوث!"); return@withContext }
             
-            onStatusUpdate("🔗 جاري فتح القناة...")
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
             
@@ -134,7 +185,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
             val outputStream = Tasks.await(channelClient.getOutputStream(channel))
             
             if (inputStream != null && outputStream != null) {
-                onStatusUpdate("📡 جاري النقل (يمكنك ترك شاشة الساعة تنطفئ الآن)...")
+                onStatusUpdate("📡 جاري النقل (يمكنك إغلاق شاشة الساعة)...")
                 val buffer = ByteArray(8 * 1024)
                 var bytesCopied = 0L
                 var bytes = inputStream.read(buffer)
@@ -146,8 +197,8 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                 }
                 inputStream.close(); outputStream.close(); channelClient.close(channel)
                 onProgressUpdate(1f)
-                onStatusUpdate("✅ تم الإرسال! افتح شاشة ساعتك للموافقة على التثبيت.")
+                onStatusUpdate("✅ تم الإرسال! وافق على التثبيت في ساعتك.")
             }
-        } catch (e: Exception) { onStatusUpdate("❌ خطأ تقني: ${e.message ?: e.javaClass.simpleName}") }
+        } catch (e: Exception) { onStatusUpdate("❌ خطأ تقني: ${e.message}") }
     }
 }
