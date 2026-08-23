@@ -47,13 +47,66 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-class MainActivity : ComponentActivity(), ChannelClient.ChannelCallback {
+class MainActivity : ComponentActivity() {
 
     // متغيرات الساعة (تتحدث تلقائياً في الشاشة)
     var watchReceiveStatus by mutableStateOf("جاهز للاستقبال")
     var watchReceivedMegabytes by mutableFloatStateOf(0f)
     var watchIsReceiving by mutableStateOf(false)
     var watchIsSuccess by mutableStateOf(false)
+
+    // 🔥 تم فصل الاستماع للقنوات في كائن مستقل لحل خطأ الوراثة 🔥
+    private val channelCallback = object : ChannelClient.ChannelCallback() {
+        override fun onChannelOpened(channel: ChannelClient.Channel) {
+            if (channel.path == "/wearload_apk_transfer") {
+                watchIsReceiving = true
+                watchIsSuccess = false
+                watchReceiveStatus = "جاري الاستلام..."
+                watchReceivedMegabytes = 0f
+
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val channelClient = Wearable.getChannelClient(this@MainActivity)
+                        val inputStream = Tasks.await(channelClient.getInputStream(channel))
+                        
+                        val apkFile = File(cacheDir, "received_app.apk")
+                        val outputStream = FileOutputStream(apkFile)
+
+                        val buffer = ByteArray(8 * 1024)
+                        var bytesRead: Int
+                        var totalBytes = 0L
+
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                            totalBytes += bytesRead
+                            watchReceivedMegabytes = (totalBytes.toFloat() / (1024f * 1024f))
+                        }
+
+                        outputStream.close()
+                        inputStream.close()
+                        channelClient.close(channel)
+
+                        watchIsReceiving = false
+                        watchIsSuccess = true
+                        watchReceiveStatus = "تم الاستلام!\nجاري التثبيت..."
+
+                        installApk(apkFile)
+                    } catch (e: Exception) {
+                        watchIsReceiving = false
+                        watchIsSuccess = false
+                        watchReceiveStatus = "حدث خطأ أثناء الاستلام"
+                    }
+                }
+            }
+        }
+
+        override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
+            if (watchIsReceiving) {
+                watchIsReceiving = false
+                watchReceiveStatus = "تم قطع الاتصال"
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,8 +115,8 @@ class MainActivity : ComponentActivity(), ChannelClient.ChannelCallback {
         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
         
         if (isWatch) {
-            // تفعيل الاستماع للملفات في الساعة فقط
-            Wearable.getChannelClient(this).registerChannelCallback(this)
+            // تسجيل الكائن المستقل للاستماع
+            Wearable.getChannelClient(this).registerChannelCallback(channelCallback)
         }
 
         setContent {
@@ -95,60 +148,7 @@ class MainActivity : ComponentActivity(), ChannelClient.ChannelCallback {
         super.onDestroy()
         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
         if (isWatch) {
-            Wearable.getChannelClient(this).unregisterChannelCallback(this)
-        }
-    }
-
-    // ==========================================
-    // منطق استقبال الملفات (يعمل في الساعة فقط)
-    // ==========================================
-    override fun onChannelOpened(channel: ChannelClient.Channel) {
-        if (channel.path == "/wearload_apk_transfer") {
-            watchIsReceiving = true
-            watchIsSuccess = false
-            watchReceiveStatus = "جاري الاستلام..."
-            watchReceivedMegabytes = 0f
-
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val channelClient = Wearable.getChannelClient(this@MainActivity)
-                    val inputStream = Tasks.await(channelClient.getInputStream(channel))
-                    
-                    val apkFile = File(cacheDir, "received_app.apk")
-                    val outputStream = FileOutputStream(apkFile)
-
-                    val buffer = ByteArray(8 * 1024)
-                    var bytesRead: Int
-                    var totalBytes = 0L
-
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
-                        totalBytes += bytesRead
-                        watchReceivedMegabytes = (totalBytes.toFloat() / (1024f * 1024f))
-                    }
-
-                    outputStream.close()
-                    inputStream.close()
-                    channelClient.close(channel)
-
-                    watchIsReceiving = false
-                    watchIsSuccess = true
-                    watchReceiveStatus = "تم الاستلام!\nجاري التثبيت..."
-
-                    installApk(apkFile)
-                } catch (e: Exception) {
-                    watchIsReceiving = false
-                    watchIsSuccess = false
-                    watchReceiveStatus = "حدث خطأ أثناء الاستلام"
-                }
-            }
-        }
-    }
-
-    override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
-        if (watchIsReceiving) {
-            watchIsReceiving = false
-            watchReceiveStatus = "تم قطع الاتصال"
+            Wearable.getChannelClient(this).unregisterChannelCallback(channelCallback)
         }
     }
 
@@ -181,9 +181,6 @@ class MainActivity : ComponentActivity(), ChannelClient.ChannelCallback {
         }
     }
 
-    // ==========================================
-    // دوال مساعدة للهاتف
-    // ==========================================
     fun getFileInfo(uri: Uri): Pair<String, Long> {
         var name = "cadran.apk"
         var size = 1L
@@ -308,7 +305,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.0", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.1", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
