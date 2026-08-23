@@ -17,7 +17,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
-import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +48,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import coil.compose.AsyncImage // مكتبة الصور
 
 class MainActivity : ComponentActivity() {
 
@@ -173,7 +172,6 @@ class MainActivity : ComponentActivity() {
 
             val action = "com.gautier.mywearload.INSTALL_COMPLETE"
             
-            // 🔥 هنا يكمن السحر الذي سيصلح الشاشة الحمراء ويفتح التثبيت
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent) {
                     val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
@@ -185,7 +183,6 @@ class MainActivity : ComponentActivity() {
                             watchIsSuccess = true
                         }
                         PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                            // إظهار شاشة "هل تريد التثبيت؟" للمستخدم
                             val userAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
                             } else {
@@ -210,7 +207,6 @@ class MainActivity : ComponentActivity() {
 
             val intentFilter = IntentFilter(action)
             
-            // 🔥 الحل الرسمي لمشكلة Targeting U+ (Android 14) 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(receiver, intentFilter, Context.RECEIVER_EXPORTED)
             } else {
@@ -292,9 +288,9 @@ fun WatchModernUI(activity: MainActivity) {
 }
 
 // ==========================================
-// تصميم شاشة الهاتف
+// تصميم شاشة الهاتف (V5.5 - مع الصور وإضافة/حذف الواجهات)
 // ==========================================
-data class StoreFace(val id: String, val name: String, val author: String, val iconColor: Color, val downloadUrl: String)
+data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
 @Composable
 fun WearModernUI(
@@ -312,13 +308,14 @@ fun WearModernUI(
     var processStatus by remember { mutableStateOf("") }
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
     
     val coroutineScope = rememberCoroutineScope()
-    val storeFaces = listOf(
-        StoreFace("1", "App Test 1", "F-Droid Store", Color(0xFFE53935), "https://f-droid.org/F-Droid.apk"),
-        StoreFace("2", "App Test 2", "F-Droid Store", Color(0xFF8E24AA), "https://f-droid.org/F-Droid.apk"),
-        StoreFace("3", "App Test 3", "F-Droid Store", Color(0xFF3949AB), "https://f-droid.org/F-Droid.apk")
-    )
+    
+    val storeFaces = remember { mutableStateListOf(
+        StoreFace("1", "Casio Retro", "Classic Watch", "https://cdn2.f-cdn.com/contestentries/1381283/26462719/5b583f769fa95_thumb900.jpg", "https://f-droid.org/F-Droid.apk"),
+        StoreFace("2", "Pixel Minimal", "Modern UI", "https://i.pinimg.com/736x/87/4f/ea/874feab00bb7097c55c70757754d9299.jpg", "https://f-droid.org/F-Droid.apk")
+    )}
 
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -334,7 +331,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.4", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.5", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -384,37 +381,58 @@ fun WearModernUI(
                 Spacer(modifier = Modifier.weight(1f))
             }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(storeFaces) { face ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).background(offColor, RoundedCornerShape(16.dp)).padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.size(48.dp).background(face.iconColor, CircleShape), contentAlignment = Alignment.Center) {
-                            Text(face.name.take(1), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text(face.author, color = Color.Gray, fontSize = 12.sp)
-                        }
-                        IconButton(
-                            onClick = {
-                                if (!isSending) {
-                                    coroutineScope.launch {
-                                        isSending = true; transferProgress = 0f
-                                        val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
-                                        if (downloadedUri != null) {
-                                            transferProgress = 0f
-                                            sendApkWithProgress(activity, downloadedUri, File(downloadedUri.path!!).length(), { transferProgress = it }, { processStatus = it })
+            Box(modifier = Modifier.weight(1f)) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(storeFaces) { face ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).background(offColor, RoundedCornerShape(16.dp)).padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = face.imageUrl,
+                                contentDescription = "Watch Face",
+                                modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
+                            )
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(face.author, color = Color.Gray, fontSize = 12.sp)
+                            }
+                            
+                            IconButton(
+                                onClick = {
+                                    if (!isSending) {
+                                        coroutineScope.launch {
+                                            isSending = true; transferProgress = 0f
+                                            val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
+                                            if (downloadedUri != null) {
+                                                transferProgress = 0f
+                                                sendApkWithProgress(activity, downloadedUri, File(downloadedUri.path!!).length(), { transferProgress = it }, { processStatus = it })
+                                            }
+                                            isSending = false
                                         }
-                                        isSending = false
                                     }
-                                }
-                            },
-                            modifier = Modifier.background(materialYouColor, CircleShape).size(40.dp)
-                        ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = materialYouIcon, modifier = Modifier.size(20.dp)) }
+                                },
+                                modifier = Modifier.background(materialYouColor, CircleShape).size(40.dp)
+                            ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = materialYouIcon, modifier = Modifier.size(20.dp)) }
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            IconButton(
+                                onClick = { storeFaces.remove(face) },
+                                modifier = Modifier.background(Color(0xFFEA4335).copy(alpha = 0.2f), CircleShape).size(40.dp)
+                            ) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFEA4335), modifier = Modifier.size(20.dp)) }
+                        }
                     }
+                }
+                
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    containerColor = onColor
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add Store", tint = Color.White)
                 }
             }
         }
@@ -436,6 +454,41 @@ fun WearModernUI(
                 Text("جاهز للاستخدام", color = Color.Gray, fontSize = 12.sp)
             }
         }
+    }
+
+    if (showAddDialog) {
+        var newName by remember { mutableStateOf("") }
+        var newAuthor by remember { mutableStateOf("") }
+        var newImgUrl by remember { mutableStateOf("") }
+        var newApkUrl by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            containerColor = offColor,
+            title = { Text("إضافة واجهة جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("اسم الواجهة (مثال: Rolex)", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = newAuthor, onValueChange = { newAuthor = it }, label = { Text("المطور", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = newImgUrl, onValueChange = { newImgUrl = it }, label = { Text("رابط الصورة (JPG/PNG)", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = newApkUrl, onValueChange = { newApkUrl = it }, label = { Text("رابط التحميل (APK)", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newName.isNotEmpty() && newApkUrl.isNotEmpty()) {
+                        storeFaces.add(StoreFace(System.currentTimeMillis().toString(), newName, newAuthor, newImgUrl, newApkUrl))
+                        showAddDialog = false
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = onColor)) { Text("حفظ وإضافة") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) { Text("إلغاء", color = Color.LightGray) }
+            }
+        )
     }
 }
 
