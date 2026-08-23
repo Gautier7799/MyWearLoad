@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,7 +49,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import coil.compose.AsyncImage // مكتبة الصور
+import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
 
@@ -258,10 +259,10 @@ fun WatchModernUI(activity: MainActivity) {
             Spacer(modifier = Modifier.height(12.dp))
 
             if (activity.watchIsReceiving) {
+                // تم إزالة trackColor ليتوافق مع الإصدارات الأقدم
                 CircularProgressIndicator(
                     modifier = Modifier.size(48.dp),
                     color = Color(0xFF3B82F6),
-                    trackColor = Color(0xFF2C3E48),
                     strokeWidth = 4.dp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -288,7 +289,7 @@ fun WatchModernUI(activity: MainActivity) {
 }
 
 // ==========================================
-// تصميم شاشة الهاتف (V5.5 - مع الصور وإضافة/حذف الواجهات)
+// تصميم شاشة الهاتف (V5.5)
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
@@ -468,13 +469,38 @@ fun WearModernUI(
             title = { Text("إضافة واجهة جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("اسم الواجهة (مثال: Rolex)", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    // تم تبسيط الكود ليكون متوافقاً مع كل الإصدارات
+                    OutlinedTextField(
+                        value = newName, 
+                        onValueChange = { newName = it }, 
+                        label = { Text("اسم الواجهة (مثال: Rolex)", color = Color.Gray) }, 
+                        modifier = Modifier.fillMaxWidth(), 
+                        textStyle = TextStyle(color = Color.White)
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = newAuthor, onValueChange = { newAuthor = it }, label = { Text("المطور", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    OutlinedTextField(
+                        value = newAuthor, 
+                        onValueChange = { newAuthor = it }, 
+                        label = { Text("المطور", color = Color.Gray) }, 
+                        modifier = Modifier.fillMaxWidth(), 
+                        textStyle = TextStyle(color = Color.White)
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = newImgUrl, onValueChange = { newImgUrl = it }, label = { Text("رابط الصورة (JPG/PNG)", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    OutlinedTextField(
+                        value = newImgUrl, 
+                        onValueChange = { newImgUrl = it }, 
+                        label = { Text("رابط الصورة (JPG/PNG)", color = Color.Gray) }, 
+                        modifier = Modifier.fillMaxWidth(), 
+                        textStyle = TextStyle(color = Color.White)
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = newApkUrl, onValueChange = { newApkUrl = it }, label = { Text("رابط التحميل (APK)", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                    OutlinedTextField(
+                        value = newApkUrl, 
+                        onValueChange = { newApkUrl = it }, 
+                        label = { Text("رابط التحميل (APK)", color = Color.Gray) }, 
+                        modifier = Modifier.fillMaxWidth(), 
+                        textStyle = TextStyle(color = Color.White)
+                    )
                 }
             },
             confirmButton = {
