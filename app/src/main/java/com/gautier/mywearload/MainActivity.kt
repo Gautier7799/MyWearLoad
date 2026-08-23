@@ -1,11 +1,14 @@
 package com.gautier.mywearload
 
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.WindowManager
@@ -56,7 +59,6 @@ class MainActivity : ComponentActivity() {
     var watchIsReceiving by mutableStateOf(false)
     var watchIsSuccess by mutableStateOf(false)
 
-    // المستمع الخاص بالساعة
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: ChannelClient.Channel) {
             if (channel.path == "/wearload_apk_transfer") {
@@ -77,54 +79,43 @@ class MainActivity : ComponentActivity() {
                         var bytesRead: Int
                         
                         try {
-                            // الاستمرار في القراءة حتى ينتهي الملف
                             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                                 outputStream.write(buffer, 0, bytesRead)
                                 totalBytes += bytesRead
                                 watchReceivedMegabytes = (totalBytes.toFloat() / (1024f * 1024f))
                             }
-                        } catch (e: Exception) {
-                            // إذا أغلق الهاتف القناة، سيعتبر الكود أن النقل انتهى ونتجاهل خطأ القراءة
-                        } finally {
+                        } catch (e: Exception) { } finally {
                             outputStream.close()
                             inputStream.close()
                             channelClient.close(channel)
                         }
 
-                        // 🔥 الفاحص الذكي: يتأكد هل الملف الذي وصل هو تطبيق APK سليم؟
+                        // فاحص الملف الذكي
                         val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
                         
                         if (packageInfo != null) {
-                            // الملف سليم 100% ومكتمل
                             watchIsReceiving = false
-                            watchIsSuccess = true
-                            watchReceiveStatus = "تم الاستلام بنجاح!\nجاري فتح التثبيت..."
+                            watchReceiveStatus = "⏳ جاري تحضير شاشة التثبيت..."
                             installApk(apkFile)
                         } else {
-                            // الملف تالف فعلاً أو مقطوع
                             watchIsReceiving = false
                             watchIsSuccess = false
-                            watchReceiveStatus = "الملف غير مكتمل، أعد الإرسال"
+                            watchReceiveStatus = "❌ الملف غير مكتمل، أعد الإرسال"
                         }
 
                     } catch (e: Exception) {
                         watchIsReceiving = false
                         watchIsSuccess = false
-                        watchReceiveStatus = "حدث خطأ في الاتصال"
+                        watchReceiveStatus = "❌ حدث خطأ في الاتصال"
                     }
                 }
             }
         }
-
-        override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
-            // تم إلغاء تغيير الحالة هنا لمنع أي إنذار كاذب عند إغلاق الاتصال السليم
-        }
+        override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {}
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // 🔥 السر هنا: منع الشاشة من الانطفاء نهائياً أثناء عمل التطبيق 🔥
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
@@ -180,14 +171,62 @@ class MainActivity : ComponentActivity() {
             input.close()
             out.close()
 
-            val intent = Intent("com.gautier.mywearload.INSTALL_COMPLETE")
+            val action = "com.gautier.mywearload.INSTALL_COMPLETE"
+            
+            // 🔥 هنا يكمن السحر الذي سيصلح الشاشة الحمراء ويفتح التثبيت
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                    val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                    
+                    when (status) {
+                        PackageInstaller.STATUS_SUCCESS -> {
+                            watchReceiveStatus = "✅ تم التثبيت بنجاح!"
+                            watchIsSuccess = true
+                        }
+                        PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                            // إظهار شاشة "هل تريد التثبيت؟" للمستخدم
+                            val userAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                intent.getParcelableExtra(Intent.EXTRA_INTENT)
+                            }
+                            
+                            if (userAction != null) {
+                                userAction.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                startActivity(userAction)
+                                watchReceiveStatus = "⏳ أكمل التثبيت من الشاشة..."
+                            }
+                        }
+                        else -> {
+                            watchReceiveStatus = "❌ فشل التثبيت: $message"
+                            watchIsSuccess = false
+                        }
+                    }
+                    try { context.unregisterReceiver(this) } catch (e: Exception) {}
+                }
+            }
+
+            val intentFilter = IntentFilter(action)
+            
+            // 🔥 الحل الرسمي لمشكلة Targeting U+ (Android 14) 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, intentFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(receiver, intentFilter)
+            }
+
+            val intent = Intent(action).setPackage(packageName)
             val pendingIntent = PendingIntent.getBroadcast(
                 this, sessionId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
             session.commit(pendingIntent.intentSender)
+
         } catch (e: Exception) {
-            watchReceiveStatus = "فشل التثبيت: ${e.message}"
+            watchReceiveStatus = "❌ فشل التثبيت: ${e.message}"
+            watchIsSuccess = false
         }
     }
 
@@ -233,8 +272,14 @@ fun WatchModernUI(activity: MainActivity) {
                 Text(String.format("%.1f MB", activity.watchReceivedMegabytes), fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
             } else if (activity.watchIsSuccess) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = Color(0xFF34A853), modifier = Modifier.size(48.dp))
-            } else if (activity.watchReceiveStatus.contains("خطأ") || activity.watchReceiveStatus.contains("مكتمل")) {
+            } else if (activity.watchReceiveStatus.contains("❌")) {
                 Icon(Icons.Filled.Warning, contentDescription = "Error", tint = Color(0xFFEA4335), modifier = Modifier.size(48.dp))
+            } else if (activity.watchReceiveStatus.contains("⏳")) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = Color(0xFFFABB05), 
+                    strokeWidth = 4.dp
+                )
             } else {
                 Box(modifier = Modifier.size(48.dp).background(Color(0xFF2C3E48), CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
                     Text("⌚", fontSize = 20.sp)
@@ -267,9 +312,6 @@ fun WearModernUI(
     var processStatus by remember { mutableStateOf("") }
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
-    var showFacesList by remember { mutableStateOf(false) }
-    var isFetchingList by remember { mutableStateOf(false) }
-    var facesList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     
     val coroutineScope = rememberCoroutineScope()
     val storeFaces = listOf(
@@ -277,29 +319,6 @@ fun WearModernUI(
         StoreFace("2", "App Test 2", "F-Droid Store", Color(0xFF8E24AA), "https://f-droid.org/F-Droid.apk"),
         StoreFace("3", "App Test 3", "F-Droid Store", Color(0xFF3949AB), "https://f-droid.org/F-Droid.apk")
     )
-
-    DisposableEffect(Unit) {
-        val messageClient = Wearable.getMessageClient(activity)
-        val listener = MessageClient.OnMessageReceivedListener { event ->
-            if (event.path == "/installed_faces_list") {
-                val dataString = String(event.data)
-                if (dataString == "EMPTY") {
-                    facesList = emptyList()
-                } else if (dataString.startsWith("ERROR|")) {
-                    facesList = listOf(Pair("خطأ في الساعة:", dataString.removePrefix("ERROR|")))
-                } else if (dataString.isNotEmpty()) {
-                    facesList = dataString.split(";;;").mapNotNull { 
-                        val parts = it.split("|")
-                        if (parts.size == 2) Pair(parts[0], parts[1]) else null
-                    }
-                }
-                isFetchingList = false
-                showFacesList = true
-            }
-        }
-        messageClient.addListener(listener)
-        onDispose { messageClient.removeListener(listener) }
-    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -315,7 +334,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.3", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.4", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -420,9 +439,6 @@ fun WearModernUI(
     }
 }
 
-// ==========================================
-// دوال التحميل والإرسال
-// ==========================================
 suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
     return withContext(Dispatchers.IO) {
         try {
@@ -510,9 +526,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                     bytes = inputStream.read(buffer)
                 }
                 outputStream.flush()
-                
-                delay(1000) // إعطاء مساحة زمنية للساعة لتنتهي من معالجة البايت الأخير
-                
+                delay(1000)
                 inputStream.close(); outputStream.close(); channelClient.close(channel)
                 onProgressUpdate(1f)
                 onStatusUpdate("✅ تم الإرسال بنجاح! راقب شاشة ساعتك.")
