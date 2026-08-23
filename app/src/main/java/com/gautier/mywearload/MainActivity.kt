@@ -49,13 +49,13 @@ import java.net.URL
 
 class MainActivity : ComponentActivity() {
 
-    // متغيرات الساعة (تتحدث تلقائياً في الشاشة)
+    // متغيرات الساعة
     var watchReceiveStatus by mutableStateOf("جاهز للاستقبال")
     var watchReceivedMegabytes by mutableFloatStateOf(0f)
     var watchIsReceiving by mutableStateOf(false)
     var watchIsSuccess by mutableStateOf(false)
 
-    // 🔥 تم فصل الاستماع للقنوات في كائن مستقل لحل خطأ الوراثة 🔥
+    // المستمع الخاص بالساعة
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: ChannelClient.Channel) {
             if (channel.path == "/wearload_apk_transfer") {
@@ -65,36 +65,50 @@ class MainActivity : ComponentActivity() {
                 watchReceivedMegabytes = 0f
 
                 CoroutineScope(Dispatchers.IO).launch {
+                    val apkFile = File(cacheDir, "received_app.apk")
+                    var totalBytes = 0L
+
                     try {
                         val channelClient = Wearable.getChannelClient(this@MainActivity)
                         val inputStream = Tasks.await(channelClient.getInputStream(channel))
-                        
-                        val apkFile = File(cacheDir, "received_app.apk")
                         val outputStream = FileOutputStream(apkFile)
-
                         val buffer = ByteArray(8 * 1024)
                         var bytesRead: Int
-                        var totalBytes = 0L
-
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
-                            totalBytes += bytesRead
-                            watchReceivedMegabytes = (totalBytes.toFloat() / (1024f * 1024f))
+                        
+                        try {
+                            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                outputStream.write(buffer, 0, bytesRead)
+                                totalBytes += bytesRead
+                                watchReceivedMegabytes = (totalBytes.toFloat() / (1024f * 1024f))
+                            }
+                        } catch (e: Exception) {
+                            // نتجاهل خطأ انقطاع الاتصال هنا، لأننا سنفحص الملف في الخطوة التالية
+                        } finally {
+                            outputStream.close()
+                            inputStream.close()
+                            channelClient.close(channel)
                         }
 
-                        outputStream.close()
-                        inputStream.close()
-                        channelClient.close(channel)
+                        // 🔥 الفاحص الذكي: يتأكد هل الملف الذي وصل هو تطبيق سليم أم تالف؟
+                        val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+                        
+                        if (packageInfo != null) {
+                            // الملف سليم 100% (تجاهل أي إنذار كاذب بانقطاع الاتصال)
+                            watchIsReceiving = false
+                            watchIsSuccess = true
+                            watchReceiveStatus = "تم الاستلام بنجاح!\nجاري بدء التثبيت..."
+                            installApk(apkFile)
+                        } else {
+                            // الملف تالف فعلاً أو لم يكتمل
+                            watchIsReceiving = false
+                            watchIsSuccess = false
+                            watchReceiveStatus = "الملف غير مكتمل، أعد الإرسال"
+                        }
 
-                        watchIsReceiving = false
-                        watchIsSuccess = true
-                        watchReceiveStatus = "تم الاستلام!\nجاري التثبيت..."
-
-                        installApk(apkFile)
                     } catch (e: Exception) {
                         watchIsReceiving = false
                         watchIsSuccess = false
-                        watchReceiveStatus = "حدث خطأ أثناء الاستلام"
+                        watchReceiveStatus = "حدث خطأ تقني في الاتصال"
                     }
                 }
             }
@@ -111,26 +125,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // فحص نوع الجهاز: هل هو ساعة أم هاتف؟
         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
-        
         if (isWatch) {
-            // تسجيل الكائن المستقل للاستماع
             Wearable.getChannelClient(this).registerChannelCallback(channelCallback)
         }
 
         setContent {
             val darkBg = Color(0xFF19242C) 
-            
             if (isWatch) {
-                // عرض واجهة الساعة
                 MaterialTheme {
                     Surface(modifier = Modifier.fillMaxSize(), color = darkBg) {
                         WatchModernUI(this)
                     }
                 }
             } else {
-                // عرض واجهة الهاتف
                 val buttonOffBg = Color(0xFF2C3E48) 
                 val buttonOnBg = Color(0xFF3B82F6) 
                 val materialYouColor = Color(0xFFC3E7FF) 
@@ -199,7 +207,7 @@ class MainActivity : ComponentActivity() {
 }
 
 // ==========================================
-// 1. تصميم شاشة الساعة (Watch UI)
+// تصميم شاشة الساعة
 // ==========================================
 @Composable
 fun WatchModernUI(activity: MainActivity) {
@@ -223,7 +231,7 @@ fun WatchModernUI(activity: MainActivity) {
                 Text(String.format("%.1f MB", activity.watchReceivedMegabytes), fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
             } else if (activity.watchIsSuccess) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = Color(0xFF34A853), modifier = Modifier.size(48.dp))
-            } else if (activity.watchReceiveStatus.contains("خطأ") || activity.watchReceiveStatus.contains("قطع")) {
+            } else if (activity.watchReceiveStatus.contains("خطأ") || activity.watchReceiveStatus.contains("قطع") || activity.watchReceiveStatus.contains("مكتمل")) {
                 Icon(Icons.Filled.Warning, contentDescription = "Error", tint = Color(0xFFEA4335), modifier = Modifier.size(48.dp))
             } else {
                 Box(modifier = Modifier.size(48.dp).background(Color(0xFF2C3E48), CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
@@ -237,7 +245,7 @@ fun WatchModernUI(activity: MainActivity) {
 }
 
 // ==========================================
-// 2. تصميم شاشة الهاتف (Phone UI)
+// تصميم شاشة الهاتف
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val iconColor: Color, val downloadUrl: String)
 
@@ -305,7 +313,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.1", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.2", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -411,7 +419,7 @@ fun WearModernUI(
 }
 
 // ==========================================
-// 3. دوال التحميل والإرسال
+// دوال التحميل والإرسال
 // ==========================================
 suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
     return withContext(Dispatchers.IO) {
@@ -500,7 +508,10 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                     bytes = inputStream.read(buffer)
                 }
                 outputStream.flush()
-                delay(500)
+                
+                // 🔥 إعطاء الساعة وقت إضافي (2 ثانية) لاستيعاب آخر بايت من الملف قبل إغلاق القناة
+                delay(2000) 
+                
                 inputStream.close(); outputStream.close(); channelClient.close(channel)
                 onProgressUpdate(1f)
                 onStatusUpdate("✅ تم الإرسال بنجاح! راقب شاشة ساعتك.")
