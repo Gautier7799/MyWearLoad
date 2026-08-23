@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -102,7 +103,6 @@ fun WearModernUI(
     
     val coroutineScope = rememberCoroutineScope()
     
-    // 🔥 استخدمت روابط حقيقية ومضمونة 100% للتجربة (حجمها حوالي 8 ميجا لنرى التحميل) 🔥
     val storeFaces = listOf(
         StoreFace("1", "App Test 1", "F-Droid Store", Color(0xFFE53935), "https://f-droid.org/F-Droid.apk"),
         StoreFace("2", "App Test 2", "F-Droid Store", Color(0xFF8E24AA), "https://f-droid.org/F-Droid.apk"),
@@ -148,7 +148,7 @@ fun WearModernUI(
         
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V4.2", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V4.3", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -388,7 +388,6 @@ fun WearModernUI(
     }
 }
 
-// 🔥 دالة التحميل الذكية التي تتخطى الروابط المعقدة وتعطي الخطأ الفعلي 🔥
 suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
     return withContext(Dispatchers.IO) {
         try {
@@ -398,7 +397,6 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
             var redirectCount = 0
             var responseCode: Int
 
-            // حلقة للتعامل مع إعادة التوجيه (Redirects)
             while (true) {
                 connection.setRequestProperty("User-Agent", "Mozilla/5.0")
                 connection.connectTimeout = 15000
@@ -422,7 +420,6 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
                 }
             }
 
-            // فحص الخطأ وطباعته
             if (responseCode == 404) {
                 onStatusUpdate("❌ الملف غير موجود بالرابط (404)")
                 return@withContext null
@@ -462,6 +459,7 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
     }
 }
 
+// 🔥 تم إجراء تعديلات جذرية هنا لمنع انقطاع القناة أثناء الإرسال 🔥
 suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
@@ -473,11 +471,19 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
             
-            val inputStream = context.contentResolver.openInputStream(apkUri)
+            // التعامل السليم مع الملفات المحملة (file://) مقارنة بالملفات المختارة من الهاتف (content://)
+            val inputStream = if (apkUri.scheme == "file") {
+                FileInputStream(File(apkUri.path!!))
+            } else {
+                context.contentResolver.openInputStream(apkUri)
+            }
+            
             val outputStream = Tasks.await(channelClient.getOutputStream(channel))
             
             if (inputStream != null && outputStream != null) {
                 onStatusUpdate("📡 جاري الإرسال للساعة...")
+                delay(500) // إعطاء الساعة نصف ثانية لتجهيز الاستقبال قبل إرسال البيانات
+                
                 val buffer = ByteArray(8 * 1024)
                 var bytesCopied = 0L
                 var bytes = inputStream.read(buffer)
@@ -487,7 +493,14 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                     if (totalSize > 0) onProgressUpdate(bytesCopied.toFloat() / totalSize.toFloat())
                     bytes = inputStream.read(buffer)
                 }
-                inputStream.close(); outputStream.close(); channelClient.close(channel)
+                
+                outputStream.flush() // 🔥 إجبار تدفق كل البيانات قبل إغلاق القناة 🔥
+                delay(500) // الانتظار نصف ثانية لضمان عبور البيانات في البلوتوث
+                
+                inputStream.close()
+                outputStream.close()
+                channelClient.close(channel)
+                
                 onProgressUpdate(1f)
                 onStatusUpdate("✅ تم الإرسال بنجاح! وافق على التثبيت في ساعتك.")
             }
