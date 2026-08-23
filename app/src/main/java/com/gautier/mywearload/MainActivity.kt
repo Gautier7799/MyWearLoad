@@ -16,12 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -75,6 +70,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// نموذج بيانات الواجهة في المتجر
+data class StoreFace(val id: String, val name: String, val author: String, val iconColor: Color)
+
 @Composable
 fun WearModernUI(
     activity: MainActivity, 
@@ -84,12 +82,14 @@ fun WearModernUI(
     materialYouColor: Color,
     materialYouIcon: Color
 ) {
+    var currentTab by remember { mutableStateOf("LOCAL") } // LOCAL أو STORE
+    
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
-    var selectedFileSize by remember { mutableStateOf(1L) }
+    var selectedFileSize by remember { mutableLongStateOf(1L) }
     
     var processStatus by remember { mutableStateOf("") }
-    var transferProgress by remember { mutableStateOf(0f) }
+    var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
     
     var showFacesList by remember { mutableStateOf(false) }
@@ -98,6 +98,14 @@ fun WearModernUI(
     
     val coroutineScope = rememberCoroutineScope()
     
+    // قائمة تجريبية للمتجر (سنقوم بربطها بروابط حقيقية لاحقاً)
+    val storeFaces = listOf(
+        StoreFace("1", "Casio Retro", "Classic Design", Color(0xFFE53935)),
+        StoreFace("2", "Neon Cyberpunk", "Futuristic Studio", Color(0xFF8E24AA)),
+        StoreFace("3", "Minimal White", "Clean Looks", Color(0xFF3949AB)),
+        StoreFace("4", "Sport Dashboard", "Fitness Track", Color(0xFF43A047))
+    )
+
     DisposableEffect(Unit) {
         val messageClient = Wearable.getMessageClient(activity)
         val listener = MessageClient.OnMessageReceivedListener { event ->
@@ -135,52 +143,135 @@ fun WearModernUI(
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V2", fontSize = 16.sp, color = Color.Gray)
+            Text("Pro Edition V3", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
-        Button(
-            onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
-            modifier = Modifier.fillMaxWidth().height(80.dp), 
-            shape = RoundedCornerShape(24.dp), 
-            colors = ButtonDefaults.buttonColors(containerColor = offColor)
-        ) {
-            Icon(Icons.Filled.Build, contentDescription = "File", tint = Color.LightGray, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
-                Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text(if (selectedFileUri == null) "اضغط هنا للبدء" else "جاهز للإرسال", color = Color.LightGray, fontSize = 12.sp)
+        // نظام التبويبات (Tabs)
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Button(
+                onClick = { currentTab = "LOCAL" },
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") onColor else offColor)
+            ) {
+                Icon(Icons.Filled.Build, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("ملف محلي", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = { currentTab = "STORE" },
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") onColor else offColor)
+            ) {
+                Icon(Icons.Filled.ShoppingCart, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("المتجر", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = { 
-                if (selectedFileUri != null && !isSending) {
-                    coroutineScope.launch {
-                        isSending = true
-                        transferProgress = 0f
-                        sendApkWithProgress(activity, selectedFileUri!!, selectedFileSize, { transferProgress = it }, { processStatus = it })
-                        isSending = false
+        if (currentTab == "LOCAL") {
+            Button(
+                onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
+                modifier = Modifier.fillMaxWidth().height(80.dp), 
+                shape = RoundedCornerShape(24.dp), 
+                colors = ButtonDefaults.buttonColors(containerColor = offColor)
+            ) {
+                Icon(Icons.Filled.Build, contentDescription = "File", tint = Color.LightGray, modifier = Modifier.size(28.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
+                    Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(if (selectedFileUri == null) "من ذاكرة الهاتف" else "جاهز للإرسال", color = Color.LightGray, fontSize = 12.sp)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { 
+                    if (selectedFileUri != null && !isSending) {
+                        coroutineScope.launch {
+                            isSending = true
+                            transferProgress = 0f
+                            sendApkWithProgress(activity, selectedFileUri!!, selectedFileSize, { transferProgress = it }, { processStatus = it })
+                            isSending = false
+                        }
+                    }
+                }, 
+                enabled = selectedFileUri != null && !isSending, 
+                modifier = Modifier.fillMaxWidth().height(80.dp), 
+                shape = RoundedCornerShape(24.dp), 
+                colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(28.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        } else {
+            // شاشة المتجر (Dépôt)
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(storeFaces) { face ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .background(offColor, RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(48.dp).background(face.iconColor, CircleShape), contentAlignment = Alignment.Center) {
+                            Text(face.name.take(1), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(face.author, color = Color.Gray, fontSize = 12.sp)
+                        }
+                        IconButton(
+                            onClick = {
+                                if (!isSending) {
+                                    coroutineScope.launch {
+                                        isSending = true
+                                        transferProgress = 0f
+                                        processStatus = "⬇️ جاري التحميل من السحابة..."
+                                        
+                                        // محاكاة التحميل السحابي (Demo)
+                                        for (i in 1..50) {
+                                            delay(40)
+                                            transferProgress = i / 100f
+                                        }
+                                        
+                                        processStatus = "📡 جاري الإرسال للساعة..."
+                                        // محاكاة الإرسال للساعة (Demo)
+                                        for (i in 51..100) {
+                                            delay(30)
+                                            transferProgress = i / 100f
+                                        }
+                                        
+                                        processStatus = "✅ تم إرسال ${face.name} بنجاح!"
+                                        isSending = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.background(materialYouColor, CircleShape).size(40.dp)
+                        ) {
+                            Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = materialYouIcon, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-            }, 
-            enabled = selectedFileUri != null && !isSending, 
-            modifier = Modifier.fillMaxWidth().height(80.dp), 
-            shape = RoundedCornerShape(24.dp), 
-            colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))
-        ) {
-            Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.weight(1f))
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (currentTab == "LOCAL") {
+            Spacer(modifier = Modifier.weight(1f))
+        } else {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
-        // 🔥 المربع الأحمر الذي طلبته (دائما يظهر حتى تعرف أن التحديث نجح) 🔥
+        // شريط متابعة الإرسال (مشترك بين المحلي والمتجر)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -199,6 +290,9 @@ fun WearModernUI(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
+                if (processStatus.isNotEmpty()) {
+                    Text(processStatus, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
             } else if (processStatus.isNotEmpty()) {
                 Text(
                     text = processStatus, 
@@ -208,13 +302,13 @@ fun WearModernUI(
                     textAlign = TextAlign.Center
                 )
             } else {
-                Text("شريط متابعة الإرسال سيظهر هنا", color = Color.Gray, fontSize = 12.sp)
+                Text("جاهز للاستخدام", color = Color.Gray, fontSize = 12.sp)
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // 🔥 تصميم Material You الذي طلبته للأزرار السفلية 🔥
+        // الأزرار السفلية
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), 
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -259,25 +353,11 @@ fun WearModernUI(
                 }
             }
             
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(offColor, CircleShape)
-                    .clip(CircleShape)
-                    .clickable { },
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.size(64.dp).background(offColor, CircleShape).clip(CircleShape).clickable { }, contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.Star, contentDescription = "Gemini", tint = Color(0xFFFABB05), modifier = Modifier.size(32.dp))
             }
             
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(offColor, CircleShape)
-                    .clip(CircleShape)
-                    .clickable { },
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.size(64.dp).background(offColor, CircleShape).clip(CircleShape).clickable { }, contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.LightGray, modifier = Modifier.size(28.dp))
             }
         }
