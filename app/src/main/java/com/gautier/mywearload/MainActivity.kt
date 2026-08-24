@@ -17,7 +17,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,9 +32,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -297,6 +298,48 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// أداة لرسم شعار Wear OS الملون برمجياً
+@Composable
+fun WearOSLogo(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val strokeWidth = w * 0.25f
+
+        // الخط الأزرق المائل
+        drawLine(
+            color = Color(0xFF4285F4),
+            start = Offset(w * 0.2f, h * 0.1f),
+            end = Offset(w * 0.45f, h * 0.9f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+
+        // الخط الأصفر المائل
+        drawLine(
+            color = Color(0xFFFBBC05),
+            start = Offset(w * 0.55f, h * 0.1f),
+            end = Offset(w * 0.8f, h * 0.9f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+
+        // النقطة الحمراء
+        drawCircle(
+            color = Color(0xFFEA4335),
+            radius = strokeWidth * 0.6f,
+            center = Offset(w * 0.95f, h * 0.25f)
+        )
+
+        // النقطة الخضراء
+        drawCircle(
+            color = Color(0xFF34A853),
+            radius = strokeWidth * 0.6f,
+            center = Offset(w * 0.85f, h * 0.6f)
+        )
+    }
+}
+
 @Composable
 fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Color, red: Color) {
     val strings = activity.currentStrings
@@ -323,7 +366,7 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
                     CircularProgressIndicator(modifier = Modifier.size(40.dp), color = yellow, strokeWidth = 3.dp)
                 } else {
                     Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
-                        Text("⌚", fontSize = 18.sp)
+                        WearOSLogo(modifier = Modifier.size(24.dp))
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -388,18 +431,11 @@ fun WearModernUI(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val imageId = activity.resources.getIdentifier("ic_app_logo", "drawable", activity.packageName)
-                    if (imageId != 0) {
-                        Image(
-                            painter = painterResource(id = imageId),
-                            contentDescription = "App Icon",
-                            modifier = Modifier.size(36.dp).clip(CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    } else {
-                        Text("⌚", fontSize = 28.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
+                    
+                    // استخدام الشعار البرمجي الملون بدلاً من الصور الخارجية
+                    WearOSLogo(modifier = Modifier.size(36.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
                     Text(
                         text = strings.title, 
                         fontSize = 32.sp, 
@@ -407,6 +443,7 @@ fun WearModernUI(
                         color = Color.White
                     )
                 }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(strings.subtitle, fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
             }
 
