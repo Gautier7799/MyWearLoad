@@ -17,7 +17,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,7 +61,7 @@ enum class AppLang { AR, EN, FR }
 class AppStrings(val lang: AppLang) {
     val isRtl get() = lang == AppLang.AR
     
-    val title = "My WearLoad"
+    val title = "WearLoad"
     val subtitle = "Pro Edition V5.13"
     
     val localFile get() = when(lang) { AppLang.AR -> "ملف محلي"; AppLang.EN -> "Local File"; AppLang.FR -> "Fichier Local" }
@@ -77,6 +75,7 @@ class AppStrings(val lang: AppLang) {
     val downloadSend get() = when(lang) { AppLang.AR -> "تحميل وإرسال"; AppLang.EN -> "Download & Send"; AppLang.FR -> "Télécharger & Envoyer" }
     val close get() = when(lang) { AppLang.AR -> "إغلاق"; AppLang.EN -> "Close"; AppLang.FR -> "Fermer" }
     val developer get() = when(lang) { AppLang.AR -> "المطور:"; AppLang.EN -> "Developer:"; AppLang.FR -> "Développeur :" }
+    val languageBtn get() = when(lang) { AppLang.AR -> "اللغة: العربية"; AppLang.EN -> "Lang: English"; AppLang.FR -> "Lang: Français" }
     
     val sConnecting get() = when(lang) { AppLang.AR -> "⬇️ جاري الاتصال بالسيرفر..."; AppLang.EN -> "⬇️ Connecting to server..."; AppLang.FR -> "⬇️ Connexion au serveur..." }
     val sErrRedirect get() = when(lang) { AppLang.AR -> "❌ خطأ: تحويلات السيرفر كثيرة"; AppLang.EN -> "❌ Error: Too many redirects"; AppLang.FR -> "❌ Erreur : Trop de redirections" }
@@ -174,12 +173,14 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val bgColor = Color(0xFF1E1E24)
+            val bgColor = Color(0xFF191C1B) // Material You Dark Background
             val googleBlue = Color(0xFF4285F4)
             val googleYellow = Color(0xFFFBBC05)
             val googleGreen = Color(0xFF34A853)
             val googleRed = Color(0xFFEA4335)
-            val surfaceColor = Color(0xFF2C2C35)
+            val surfaceColor = Color(0xFF2C322F) // Material You Dark Surface
+            val pillActive = Color(0xFF89D6B3) // Light Green Accent
+            val pillActiveText = Color(0xFF003824)
 
             if (isWatch) {
                 MaterialTheme {
@@ -190,7 +191,7 @@ class MainActivity : ComponentActivity() {
             } else {
                 MaterialTheme { 
                     Surface(modifier = Modifier.fillMaxSize(), color = bgColor) { 
-                        WearModernUI(this, bgColor, surfaceColor, googleBlue, googleGreen, googleYellow) 
+                        WearModernUI(this, bgColor, surfaceColor, pillActive, pillActiveText, googleYellow, googleGreen) 
                     } 
                 }
             }
@@ -338,9 +339,10 @@ fun WearModernUI(
     activity: MainActivity, 
     bgColor: Color, 
     surfaceColor: Color, 
-    primaryColor: Color,
-    successColor: Color,
-    warningColor: Color
+    pillActive: Color,
+    pillActiveText: Color,
+    warningColor: Color,
+    successColor: Color
 ) {
     val strings = activity.currentStrings
     
@@ -377,121 +379,105 @@ fun WearModernUI(
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides if (strings.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 32.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 24.dp)) {
             
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // 1. Title Alone at the top (Center Aligned)
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp, top = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Lang Button (Left/Start)
-                Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.CenterStart) {
-                    Text(
-                        text = activity.currentLang.name,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        modifier = Modifier
-                            .background(primaryColor, RoundedCornerShape(12.dp))
-                            .clickable { 
-                                val nextLang = when (activity.currentLang) {
-                                    AppLang.AR -> AppLang.EN
-                                    AppLang.EN -> AppLang.FR
-                                    AppLang.FR -> AppLang.AR
-                                }
-                                activity.currentLang = nextLang
-                                activity.prefs.edit().putString("APP_LANG", nextLang.name).apply()
-                                
-                                if (!activity.watchIsReceiving && !activity.watchIsSuccess) {
-                                    activity.watchReceiveStatus = activity.currentStrings.wReady
-                                }
-                                processStatus = ""
-                            }
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    )
-                }
-                
-                // Title & Subtitle (Center)
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1.5f)
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = strings.title, 
-                        fontSize = 24.sp, 
+                        fontSize = 32.sp, 
                         fontWeight = FontWeight.ExtraBold, 
-                        color = Color.White, 
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = Color.White
                     )
-                    Text(strings.subtitle, fontSize = 12.sp, color = warningColor, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("⌚", fontSize = 28.sp)
                 }
-                
-                // Icon placeholder (Right/End)
-                Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.CenterEnd) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .background(Color.Transparent, RoundedCornerShape(12.dp))
-                            .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val imageId = activity.resources.getIdentifier("ic_launcher", "mipmap", activity.packageName)
-                        if (imageId != 0) {
-                            Image(
-                                painter = painterResource(id = imageId),
-                                contentDescription = "App Icon",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Icon(Icons.Filled.Build, contentDescription = null, tint = primaryColor)
+                Text(strings.subtitle, fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
+            }
+
+            // 2. Control Grid (Language and Tabs)
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Language Button (Pill Shape)
+                Button(
+                    onClick = {
+                        val nextLang = when (activity.currentLang) {
+                            AppLang.AR -> AppLang.EN
+                            AppLang.EN -> AppLang.FR
+                            AppLang.FR -> AppLang.AR
                         }
+                        activity.currentLang = nextLang
+                        activity.prefs.edit().putString("APP_LANG", nextLang.name).apply()
+                        if (!activity.watchIsReceiving && !activity.watchIsSuccess) {
+                            activity.watchReceiveStatus = activity.currentStrings.wReady
+                        }
+                        processStatus = ""
+                    },
+                    modifier = Modifier.weight(1f).height(64.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Language", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(strings.languageBtn, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
 
-            // Tabs
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp).height(56.dp)) {
+            // Tabs (Pill Shapes)
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
-                    onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).fillMaxHeight(),
-                    shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 0.dp, bottomEnd = 0.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") primaryColor else surfaceColor)
-                ) { Text(strings.localFile, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                    onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).height(64.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") pillActive else surfaceColor)
+                ) { 
+                    Text(strings.localFile, color = if (currentTab == "LOCAL") pillActiveText else Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) 
+                }
                 
                 Button(
-                    onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).fillMaxHeight(),
-                    shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 12.dp, bottomEnd = 12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") primaryColor else surfaceColor)
-                ) { Text(strings.store, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                    onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).height(64.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") pillActive else surfaceColor)
+                ) { 
+                    Text(strings.store, color = if (currentTab == "STORE") pillActiveText else Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) 
+                }
             }
 
-            // Content
+            // 3. Content Area
             if (currentTab == "LOCAL") {
-                // Select File Button
+                // Select File Button (Pill Shape)
                 Button(
                     onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
-                    modifier = Modifier.fillMaxWidth().height(90.dp), 
-                    shape = RoundedCornerShape(16.dp), 
+                    modifier = Modifier.fillMaxWidth().height(80.dp), 
+                    shape = CircleShape, 
                     colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                     ) {
+                        Box(
+                            modifier = Modifier.size(48.dp).background(Color(0xFF3F4944), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Build, contentDescription = "File", tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
                         Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
-                            Text(if (selectedFileUri == null) strings.selectFile else selectedFileName, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (selectedFileUri == null) strings.selectFile else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(if (selectedFileUri == null) strings.fromStorage else strings.readyToSend, color = Color.LightGray, fontSize = 14.sp)
                         }
-                        Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(32.dp))
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                // Send Button
+                // Send Button (Pill Shape - Accent)
                 Button(
                     onClick = { 
                         if (selectedFileUri != null && !isSending) {
@@ -503,22 +489,31 @@ fun WearModernUI(
                         }
                     }, 
                     enabled = selectedFileUri != null && !isSending, 
-                    modifier = Modifier.fillMaxWidth().height(60.dp).border(2.dp, if (selectedFileUri != null) Color.Gray else Color.DarkGray, RoundedCornerShape(16.dp)), 
-                    shape = RoundedCornerShape(16.dp), 
+                    modifier = Modifier.fillMaxWidth().height(80.dp), 
+                    shape = CircleShape, 
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent
+                        containerColor = if (selectedFileUri != null) pillActive else surfaceColor,
+                        disabledContainerColor = surfaceColor
                     )
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically, 
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(48.dp).background(if (selectedFileUri != null) pillActiveText.copy(alpha=0.2f) else Color(0xFF3F4944), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Send, contentDescription = "Send", tint = if (selectedFileUri != null) pillActiveText else Color.Gray, modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
                         Text(
                             text = if (isSending) strings.sending else strings.sendToWatch, 
-                            color = if (selectedFileUri != null) Color.White else Color.Gray, 
+                            color = if (selectedFileUri != null) pillActiveText else Color.Gray, 
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Icon(Icons.Filled.Send, contentDescription = "Send", tint = if (selectedFileUri != null) Color.White else Color.Gray, modifier = Modifier.size(24.dp))
                     }
                 }
             } else {
@@ -528,13 +523,23 @@ fun WearModernUI(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 16.dp)
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .padding(bottom = 12.dp)
+                                    .clip(CircleShape)
                                     .background(surfaceColor)
                                     .clickable { selectedFacePreview = face }
-                                    .padding(16.dp),
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                AsyncImage(
+                                    model = face.imageUrl,
+                                    contentDescription = "Watch Face",
+                                    modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(face.author, color = Color.Gray, fontSize = 12.sp)
+                                }
                                 IconButton(
                                     onClick = {
                                         if (!isSending) {
@@ -549,21 +554,8 @@ fun WearModernUI(
                                             }
                                         }
                                     },
-                                    modifier = Modifier.background(primaryColor, CircleShape).size(48.dp)
-                                ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(24.dp)) }
-                                
-                                Spacer(modifier = Modifier.width(16.dp))
-                                
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                    Text(face.author, color = Color.Gray, fontSize = 14.sp)
-                                }
-                                
-                                AsyncImage(
-                                    model = face.imageUrl,
-                                    contentDescription = "Watch Face",
-                                    modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray).border(1.dp, Color.Gray, CircleShape)
-                                )
+                                    modifier = Modifier.background(Color(0xFF3F4944), CircleShape).size(48.dp)
+                                ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(20.dp)) }
                             }
                         }
                     }
@@ -572,20 +564,20 @@ fun WearModernUI(
 
             Spacer(modifier = if (currentTab == "LOCAL") Modifier.weight(1f) else Modifier.height(16.dp))
 
-            // Status Footer
+            // 4. Status Footer (Pill Shape)
             Column(
-                modifier = Modifier.fillMaxWidth().background(surfaceColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
+                modifier = Modifier.fillMaxWidth().background(surfaceColor, CircleShape).padding(horizontal = 24.dp, vertical = 16.dp).heightIn(min = 60.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
             ) {
                 if (isSending || transferProgress > 0f) {
-                    LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = successColor, trackColor = bgColor)
+                    LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape), color = pillActive, trackColor = Color(0xFF3F4944))
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
                     if (processStatus.isNotEmpty()) Text(processStatus, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 } else if (processStatus.isNotEmpty()) {
                     Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else successColor, fontWeight = FontWeight.Medium, fontSize = 14.sp, textAlign = TextAlign.Center)
                 } else {
-                    Text(strings.readyToUse, color = Color.Gray, fontSize = 14.sp)
+                    Text(strings.readyToUse, color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -623,8 +615,8 @@ fun WearModernUI(
                                 }
                             }
                         }, 
-                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-                    ) { Text(strings.downloadSend, fontWeight = FontWeight.Bold) }
+                        colors = ButtonDefaults.buttonColors(containerColor = pillActive)
+                    ) { Text(strings.downloadSend, color = pillActiveText, fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = {
                     TextButton(onClick = { selectedFacePreview = null }) { Text(strings.close, color = Color.LightGray) }
