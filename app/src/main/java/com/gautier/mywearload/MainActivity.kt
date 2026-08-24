@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -31,12 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.Wearable
@@ -51,21 +54,65 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import coil.compose.AsyncImage
+
+enum class AppLang { AR, EN, FR }
+
+class AppStrings(val lang: AppLang) {
+    val isRtl get() = lang == AppLang.AR
+    
+    val localFile get() = when(lang) { AppLang.AR -> "ملف محلي"; AppLang.EN -> "Local File"; AppLang.FR -> "Fichier Local" }
+    val store get() = when(lang) { AppLang.AR -> "المتجر"; AppLang.EN -> "Store"; AppLang.FR -> "Boutique" }
+    val selectFile get() = when(lang) { AppLang.AR -> "اختر ملف Cadran"; AppLang.EN -> "Select Cadran File"; AppLang.FR -> "Sélectionner un fichier Cadran" }
+    val fromStorage get() = when(lang) { AppLang.AR -> "من ذاكرة الهاتف"; AppLang.EN -> "From Phone Storage"; AppLang.FR -> "Depuis le stockage" }
+    val readyToSend get() = when(lang) { AppLang.AR -> "جاهز للإرسال"; AppLang.EN -> "Ready to Send"; AppLang.FR -> "Prêt à envoyer" }
+    val sendToWatch get() = when(lang) { AppLang.AR -> "إرسال إلى الساعة"; AppLang.EN -> "Send to Watch"; AppLang.FR -> "Envoyer à la montre" }
+    val sending get() = when(lang) { AppLang.AR -> "جاري الإرسال للساعة..."; AppLang.EN -> "Sending to Watch..."; AppLang.FR -> "Envoi à la montre..." }
+    val readyToUse get() = when(lang) { AppLang.AR -> "جاهز للاستخدام"; AppLang.EN -> "Ready to use"; AppLang.FR -> "Prêt à l'emploi" }
+    val downloadSend get() = when(lang) { AppLang.AR -> "تحميل وإرسال"; AppLang.EN -> "Download & Send"; AppLang.FR -> "Télécharger & Envoyer" }
+    val close get() = when(lang) { AppLang.AR -> "إغلاق"; AppLang.EN -> "Close"; AppLang.FR -> "Fermer" }
+    val developer get() = when(lang) { AppLang.AR -> "المطور:"; AppLang.EN -> "Developer:"; AppLang.FR -> "Développeur :" }
+    
+    val sConnecting get() = when(lang) { AppLang.AR -> "⬇️ جاري الاتصال بالسيرفر..."; AppLang.EN -> "⬇️ Connecting to server..."; AppLang.FR -> "⬇️ Connexion au serveur..." }
+    val sErrRedirect get() = when(lang) { AppLang.AR -> "❌ خطأ: تحويلات السيرفر كثيرة"; AppLang.EN -> "❌ Error: Too many redirects"; AppLang.FR -> "❌ Erreur : Trop de redirections" }
+    val sErrServer get() = when(lang) { AppLang.AR -> "❌ خطأ في السيرفر: Code"; AppLang.EN -> "❌ Server Error: Code"; AppLang.FR -> "❌ Erreur Serveur : Code" }
+    val sDownloading get() = when(lang) { AppLang.AR -> "⬇️ جاري التحميل من السحابة..."; AppLang.EN -> "⬇️ Downloading from cloud..."; AppLang.FR -> "⬇️ Téléchargement depuis le cloud..." }
+    val sErrConn get() = when(lang) { AppLang.AR -> "❌ خطأ بالاتصال:"; AppLang.EN -> "❌ Connection error:"; AppLang.FR -> "❌ Erreur de connexion :" }
+    val sSearchWatch get() = when(lang) { AppLang.AR -> "🔍 البحث عن الساعة..."; AppLang.EN -> "🔍 Searching for watch..."; AppLang.FR -> "🔍 Recherche de la montre..." }
+    val sErrBlue get() = when(lang) { AppLang.AR -> "❌ تأكد من تشغيل البلوتوث وربط الساعة!"; AppLang.EN -> "❌ Please enable Bluetooth & pair watch!"; AppLang.FR -> "❌ Activez le Bluetooth et associez la montre !" }
+    val sPreparing get() = when(lang) { AppLang.AR -> "🔄 تحضير الملف للنقل..."; AppLang.EN -> "🔄 Preparing file for transfer..."; AppLang.FR -> "🔄 Préparation du fichier..." }
+    val sErrRead get() = when(lang) { AppLang.AR -> "❌ خطأ: لم أتمكن من قراءة الملف"; AppLang.EN -> "❌ Error: Could not read file"; AppLang.FR -> "❌ Erreur : Impossible de lire le fichier" }
+    val sTransferring get() = when(lang) { AppLang.AR -> "📡 جاري نقل الملف بالكامل..."; AppLang.EN -> "📡 Transferring full file..."; AppLang.FR -> "📡 Transfert du fichier complet..." }
+    val sSuccessTrans get() = when(lang) { AppLang.AR -> "✅ تم النقل! جارٍ التثبيت في الساعة..."; AppLang.EN -> "✅ Transferred! Installing on watch..."; AppLang.FR -> "✅ Transféré ! Installation sur la montre..." }
+    val sErrLost get() = when(lang) { AppLang.AR -> "❌ انقطع الاتصال:"; AppLang.EN -> "❌ Connection lost:"; AppLang.FR -> "❌ Connexion perdue :" }
+    
+    val wReady get() = when(lang) { AppLang.AR -> "جاهز للاستقبال"; AppLang.EN -> "Ready to Receive"; AppLang.FR -> "Prêt à recevoir" }
+    val wReceiving get() = when(lang) { AppLang.AR -> "جاري استلام الملف..."; AppLang.EN -> "Receiving file..."; AppLang.FR -> "Réception du fichier..." }
+    val wChecking get() = when(lang) { AppLang.AR -> "⏳ جاري فحص الملف..."; AppLang.EN -> "⏳ Checking file..."; AppLang.FR -> "⏳ Vérification du fichier..." }
+    val wPreparingInstall get() = when(lang) { AppLang.AR -> "⏳ جاري تحضير شاشة التثبيت..."; AppLang.EN -> "⏳ Preparing installation screen..."; AppLang.FR -> "⏳ Préparation de l'installation..." }
+    val wErrCorrupt get() = when(lang) { AppLang.AR -> "❌ الملف تالف، أعد المحاولة"; AppLang.EN -> "❌ File corrupted, try again"; AppLang.FR -> "❌ Fichier corrompu, réessayez" }
+    val wSuccess get() = when(lang) { AppLang.AR -> "✅ تم التثبيت بنجاح!"; AppLang.EN -> "✅ Installed successfully!"; AppLang.FR -> "✅ Installé avec succès !" }
+    val wPending get() = when(lang) { AppLang.AR -> "⏳ أكمل التثبيت من الشاشة..."; AppLang.EN -> "⏳ Complete installation on screen..."; AppLang.FR -> "⏳ Terminez l'installation sur l'écran..." }
+    val wFail get() = when(lang) { AppLang.AR -> "❌ فشل التثبيت:"; AppLang.EN -> "❌ Install failed:"; AppLang.FR -> "❌ Échec de l'installation :" }
+    val wStartErr get() = when(lang) { AppLang.AR -> "❌ خطأ في بدء الاستلام"; AppLang.EN -> "❌ Error starting reception"; AppLang.FR -> "❌ Erreur de réception" }
+    val wSendingTxt get() = when(lang) { AppLang.AR -> "جاري النقل..."; AppLang.EN -> "Transferring..."; AppLang.FR -> "Transfert en cours..." }
+}
 
 class MainActivity : ComponentActivity() {
 
-    var watchReceiveStatus by mutableStateOf("جاهز للاستقبال")
+    lateinit var prefs: SharedPreferences
+    var currentLang by mutableStateOf(AppLang.AR)
+    val currentStrings get() = AppStrings(currentLang)
+
+    var watchReceiveStatus by mutableStateOf("")
     var watchIsReceiving by mutableStateOf(false)
     var watchIsSuccess by mutableStateOf(false)
 
-    // المستمع المحدث: ينتظر انتهاء النقل تماماً قبل فحص الملف
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: ChannelClient.Channel) {
             if (channel.path == "/wearload_apk_transfer") {
                 watchIsReceiving = true
                 watchIsSuccess = false
-                watchReceiveStatus = "جاري استلام الملف..."
+                watchReceiveStatus = currentStrings.wReceiving
 
                 CoroutineScope(Dispatchers.IO).launch {
                     val apkFile = File(cacheDir, "received_app.apk")
@@ -73,35 +120,33 @@ class MainActivity : ComponentActivity() {
 
                     try {
                         val channelClient = Wearable.getChannelClient(this@MainActivity)
-                        // هذا الأمر يخبر النظام أين يضع الملف، ويعود فوراً (لا ينتظر النقل)
                         Tasks.await(channelClient.receiveFile(channel, Uri.fromFile(apkFile), false))
                     } catch (e: Exception) {
                         watchIsReceiving = false
                         watchIsSuccess = false
-                        watchReceiveStatus = "❌ خطأ في بدء الاستلام"
+                        watchReceiveStatus = currentStrings.wStartErr
                     }
                 }
             }
         }
         
-        // هنا يكمن الحل! ننتظر حتى يغلق الهاتف القناة (مما يعني انتهاء النقل 100%)
         override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
             if (channel.path == "/wearload_apk_transfer") {
                 CoroutineScope(Dispatchers.IO).launch {
-                    watchReceiveStatus = "⏳ جاري فحص الملف..."
-                    delay(1500) // انتظار ثانية ونصف لضمان حفظ الملف في ذاكرة الساعة بالكامل
+                    watchReceiveStatus = currentStrings.wChecking
+                    delay(1500) 
                     
                     val apkFile = File(cacheDir, "received_app.apk")
                     val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
                     
                     if (packageInfo != null) {
                         watchIsReceiving = false
-                        watchReceiveStatus = "⏳ جاري تحضير شاشة التثبيت..."
+                        watchReceiveStatus = currentStrings.wPreparingInstall
                         installApk(apkFile)
                     } else {
                         watchIsReceiving = false
                         watchIsSuccess = false
-                        watchReceiveStatus = "❌ الملف تالف، أعد المحاولة"
+                        watchReceiveStatus = currentStrings.wErrCorrupt
                     }
                 }
             }
@@ -111,6 +156,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        prefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        val savedLangStr = prefs.getString("APP_LANG", "AR") ?: "AR"
+        currentLang = try { AppLang.valueOf(savedLangStr) } catch (e: Exception) { AppLang.AR }
+        watchReceiveStatus = currentStrings.wReady
 
         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
         if (isWatch) {
@@ -176,7 +226,7 @@ class MainActivity : ComponentActivity() {
                     
                     when (status) {
                         PackageInstaller.STATUS_SUCCESS -> {
-                            watchReceiveStatus = "✅ تم التثبيت بنجاح!"
+                            watchReceiveStatus = currentStrings.wSuccess
                             watchIsSuccess = true
                         }
                         PackageInstaller.STATUS_PENDING_USER_ACTION -> {
@@ -190,11 +240,11 @@ class MainActivity : ComponentActivity() {
                             if (userAction != null) {
                                 userAction.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 startActivity(userAction)
-                                watchReceiveStatus = "⏳ أكمل التثبيت من الشاشة..."
+                                watchReceiveStatus = currentStrings.wPending
                             }
                         }
                         else -> {
-                            watchReceiveStatus = "❌ فشل التثبيت: $message"
+                            watchReceiveStatus = "${currentStrings.wFail} $message"
                             watchIsSuccess = false
                         }
                     }
@@ -217,7 +267,7 @@ class MainActivity : ComponentActivity() {
             session.commit(pendingIntent.intentSender)
 
         } catch (e: Exception) {
-            watchReceiveStatus = "❌ فشل التثبيت: ${e.message}"
+            watchReceiveStatus = "${currentStrings.wFail} ${e.message}"
             watchIsSuccess = false
         }
     }
@@ -241,39 +291,42 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Color, red: Color) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
-            Spacer(modifier = Modifier.height(12.dp))
+    val strings = activity.currentStrings
+    
+    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
+                Spacer(modifier = Modifier.height(12.dp))
 
-            if (activity.watchIsReceiving) {
-                CircularProgressIndicator(modifier = Modifier.size(40.dp), color = blue, strokeWidth = 3.dp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("جاري النقل...", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
-            } else if (activity.watchIsSuccess) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = green, modifier = Modifier.size(40.dp))
-            } else if (activity.watchReceiveStatus.contains("❌")) {
-                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = red, modifier = Modifier.size(40.dp))
-            } else if (activity.watchReceiveStatus.contains("⏳")) {
-                CircularProgressIndicator(modifier = Modifier.size(40.dp), color = yellow, strokeWidth = 3.dp)
-            } else {
-                Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
-                    Text("⌚", fontSize = 18.sp)
+                if (activity.watchIsReceiving) {
+                    CircularProgressIndicator(modifier = Modifier.size(40.dp), color = blue, strokeWidth = 3.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(strings.wSendingTxt, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                } else if (activity.watchIsSuccess) {
+                    Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = green, modifier = Modifier.size(40.dp))
+                } else if (activity.watchReceiveStatus.contains("❌")) {
+                    Icon(Icons.Filled.Warning, contentDescription = "Error", tint = red, modifier = Modifier.size(40.dp))
+                } else if (activity.watchReceiveStatus.contains("⏳")) {
+                    CircularProgressIndicator(modifier = Modifier.size(40.dp), color = yellow, strokeWidth = 3.dp)
+                } else {
+                    Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
+                        Text("⌚", fontSize = 18.sp)
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(activity.watchReceiveStatus, fontSize = 11.sp, color = Color.LightGray, textAlign = TextAlign.Center)
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(activity.watchReceiveStatus, fontSize = 11.sp, color = Color.LightGray, textAlign = TextAlign.Center)
         }
     }
 }
 
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WearModernUI(
     activity: MainActivity, 
@@ -283,6 +336,8 @@ fun WearModernUI(
     successColor: Color,
     warningColor: Color
 ) {
+    val strings = activity.currentStrings
+    
     var currentTab by remember { mutableStateOf("LOCAL") }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("") }
@@ -290,7 +345,6 @@ fun WearModernUI(
     var processStatus by remember { mutableStateOf("") }
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
-    var showAddDialog by remember { mutableStateOf(false) }
     var selectedFacePreview by remember { mutableStateOf<StoreFace?>(null) }
     
     val coroutineScope = rememberCoroutineScope()
@@ -316,189 +370,219 @@ fun WearModernUI(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.13", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold)
-        }
-
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-            Button(
-                onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") primaryColor else surfaceColor)
-            ) { Text("ملف محلي", color = Color.White, fontWeight = FontWeight.Bold) }
+    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             
-            Button(
-                onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") primaryColor else surfaceColor)
-            ) { Text("المتجر", color = Color.White, fontWeight = FontWeight.Bold) }
-        }
-
-        if (currentTab == "LOCAL") {
-            Button(
-                onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
-                modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
-                colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(28.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
-                        Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(if (selectedFileUri == null) "من ذاكرة الهاتف" else "جاهز للإرسال", color = Color.LightGray, fontSize = 12.sp)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Button(
-                onClick = { 
-                    if (selectedFileUri != null && !isSending) {
-                        coroutineScope.launch {
-                            isSending = true; transferProgress = 0f
-                            sendApkToWatchModern(activity, selectedFileUri!!, selectedFileSize, { transferProgress = it }, { processStatus = it })
-                            isSending = false
-                        }
-                    }
-                }, 
-                enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
-                colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) successColor else surfaceColor.copy(alpha = 0.5f))
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(22.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isSending) "جاري الإرسال للساعة..." else "إرسال إلى الساعة", 
-                        color = Color.White, 
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        } else {
-            Box(modifier = Modifier.weight(1f)) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(storeFaces) { face ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(surfaceColor)
-                                .clickable { selectedFacePreview = face }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AsyncImage(
-                                model = face.imageUrl,
-                                contentDescription = "Watch Face",
-                                modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
-                            )
-                            
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(face.author, color = Color.Gray, fontSize = 12.sp)
-                            }
-                            
-                            IconButton(
-                                onClick = {
-                                    if (!isSending) {
-                                        coroutineScope.launch {
-                                            isSending = true; transferProgress = 0f
-                                            val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
-                                            if (downloadedUri != null) {
-                                                transferProgress = 0f
-                                                sendApkToWatchModern(activity, downloadedUri, File(downloadedUri.path!!).length(), { transferProgress = it }, { processStatus = it })
-                                            }
-                                            isSending = false
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.background(primaryColor, CircleShape).size(40.dp)
-                            ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(20.dp)) }
-                        }
-                    }
+                Box(modifier = Modifier.width(60.dp)) // Spacer for balance
+                
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("My WearLoad", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Pro Edition V5.13", fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
                 }
                 
-                FloatingActionButton(
-                    onClick = { showAddDialog = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                    containerColor = primaryColor
-                ) { Icon(Icons.Filled.Add, contentDescription = "Add Store", tint = Color.White) }
-            }
-        }
-
-        Spacer(modifier = if (currentTab == "LOCAL") Modifier.weight(1f) else Modifier.height(8.dp))
-
-        Column(
-            modifier = Modifier.fillMaxWidth().background(surfaceColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
-        ) {
-            if (isSending || transferProgress > 0f) {
-                LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape), color = successColor, trackColor = bgColor)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
-                if (processStatus.isNotEmpty()) Text(processStatus, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-            } else if (processStatus.isNotEmpty()) {
-                Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else successColor, fontWeight = FontWeight.Medium, fontSize = 14.sp, textAlign = TextAlign.Center)
-            } else {
-                Text("جاهز للاستخدام", color = Color.Gray, fontSize = 12.sp)
-            }
-        }
-    }
-
-    if (selectedFacePreview != null) {
-        AlertDialog(
-            onDismissRequest = { selectedFacePreview = null },
-            containerColor = surfaceColor,
-            title = { Text(selectedFacePreview!!.name, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    AsyncImage(
-                        model = selectedFacePreview!!.imageUrl,
-                        contentDescription = "Preview",
-                        modifier = Modifier.size(200.dp).clip(CircleShape).background(Color.DarkGray)
+                Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
+                    Text(
+                        text = activity.currentLang.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .background(primaryColor, RoundedCornerShape(8.dp))
+                            .clickable { 
+                                val nextLang = when (activity.currentLang) {
+                                    AppLang.AR -> AppLang.EN
+                                    AppLang.EN -> AppLang.FR
+                                    AppLang.FR -> AppLang.AR
+                                }
+                                activity.currentLang = nextLang
+                                activity.prefs.edit().putString("APP_LANG", nextLang.name).apply()
+                                
+                                if (!activity.watchIsReceiving && !activity.watchIsSuccess) {
+                                    activity.watchReceiveStatus = activity.currentStrings.wReady
+                                }
+                                processStatus = ""
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("المطور: ${selectedFacePreview!!.author}", color = Color.LightGray, fontSize = 16.sp)
                 }
-            },
-            confirmButton = {
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 Button(
-                    onClick = {
-                        val face = selectedFacePreview!!
-                        selectedFacePreview = null 
-                        if (!isSending) {
+                    onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") primaryColor else surfaceColor)
+                ) { Text(strings.localFile, color = Color.White, fontWeight = FontWeight.Bold) }
+                
+                Button(
+                    onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") primaryColor else surfaceColor)
+                ) { Text(strings.store, color = Color.White, fontWeight = FontWeight.Bold) }
+            }
+
+            if (currentTab == "LOCAL") {
+                Button(
+                    onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
+                    modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
+                            Text(if (selectedFileUri == null) strings.selectFile else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (selectedFileUri == null) strings.fromStorage else strings.readyToSend, color = Color.LightGray, fontSize = 12.sp)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = { 
+                        if (selectedFileUri != null && !isSending) {
                             coroutineScope.launch {
                                 isSending = true; transferProgress = 0f
-                                val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, { transferProgress = it }, { processStatus = it })
-                                if (downloadedUri != null) {
-                                    transferProgress = 0f
-                                    sendApkToWatchModern(activity, downloadedUri, File(downloadedUri.path!!).length(), { transferProgress = it }, { processStatus = it })
-                                }
+                                sendApkToWatchModern(activity, selectedFileUri!!, strings, { transferProgress = it }, { processStatus = it })
                                 isSending = false
                             }
                         }
                     }, 
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-                ) { Text("تحميل وإرسال", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { selectedFacePreview = null }) { Text("إغلاق", color = Color.LightGray) }
+                    enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) successColor else surfaceColor.copy(alpha = 0.5f))
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSending) strings.sending else strings.sendToWatch, 
+                            color = Color.White, 
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            } else {
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(storeFaces) { face ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(surfaceColor)
+                                    .clickable { selectedFacePreview = face }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = face.imageUrl,
+                                    contentDescription = "Watch Face",
+                                    modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
+                                )
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(face.author, color = Color.Gray, fontSize = 12.sp)
+                                }
+                                
+                                IconButton(
+                                    onClick = {
+                                        if (!isSending) {
+                                            coroutineScope.launch {
+                                                isSending = true; transferProgress = 0f
+                                                val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, strings, { transferProgress = it }, { processStatus = it })
+                                                if (downloadedUri != null) {
+                                                    transferProgress = 0f
+                                                    sendApkToWatchModern(activity, downloadedUri, strings, { transferProgress = it }, { processStatus = it })
+                                                }
+                                                isSending = false
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.background(primaryColor, CircleShape).size(40.dp)
+                                ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                            }
+                        }
+                    }
+                }
             }
-        )
+
+            Spacer(modifier = if (currentTab == "LOCAL") Modifier.weight(1f) else Modifier.height(8.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth().background(surfaceColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
+            ) {
+                if (isSending || transferProgress > 0f) {
+                    LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape), color = successColor, trackColor = bgColor)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (processStatus.isNotEmpty()) Text(processStatus, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                } else if (processStatus.isNotEmpty()) {
+                    Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else successColor, fontWeight = FontWeight.Medium, fontSize = 14.sp, textAlign = TextAlign.Center)
+                } else {
+                    Text(strings.readyToUse, color = Color.Gray, fontSize = 12.sp)
+                }
+            }
+        }
+
+        if (selectedFacePreview != null) {
+            AlertDialog(
+                onDismissRequest = { selectedFacePreview = null },
+                containerColor = surfaceColor,
+                title = { Text(selectedFacePreview!!.name, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        AsyncImage(
+                            model = selectedFacePreview!!.imageUrl,
+                            contentDescription = "Preview",
+                            modifier = Modifier.size(200.dp).clip(CircleShape).background(Color.DarkGray)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("${strings.developer} ${selectedFacePreview!!.author}", color = Color.LightGray, fontSize = 16.sp)
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val face = selectedFacePreview!!
+                            selectedFacePreview = null 
+                            if (!isSending) {
+                                coroutineScope.launch {
+                                    isSending = true; transferProgress = 0f
+                                    val downloadedUri = downloadApkFromUrl(activity, face.downloadUrl, strings, { transferProgress = it }, { processStatus = it })
+                                    if (downloadedUri != null) {
+                                        transferProgress = 0f
+                                        sendApkToWatchModern(activity, downloadedUri, strings, { transferProgress = it }, { processStatus = it })
+                                    }
+                                    isSending = false
+                                }
+                            }
+                        }, 
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    ) { Text(strings.downloadSend, fontWeight = FontWeight.Bold) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { selectedFacePreview = null }) { Text(strings.close, color = Color.LightGray) }
+                }
+            )
+        }
     }
 }
 
-suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
+suspend fun downloadApkFromUrl(context: Context, urlString: String, strings: AppStrings, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit): Uri? {
     return withContext(Dispatchers.IO) {
         try {
-            onStatusUpdate("⬇️ جاري الاتصال بالسيرفر...")
+            onStatusUpdate(strings.sConnecting)
             var url = URL(urlString)
             var connection = url.openConnection() as HttpURLConnection
             var redirectCount = 0
@@ -519,18 +603,18 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
                     connection = url.openConnection() as HttpURLConnection
                     redirectCount++
                     if (redirectCount > 5) {
-                        onStatusUpdate("❌ خطأ: تحويلات السيرفر كثيرة")
+                        onStatusUpdate(strings.sErrRedirect)
                         return@withContext null
                     }
                 } else break
             }
 
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                onStatusUpdate("❌ خطأ في السيرفر: Code $responseCode")
+                onStatusUpdate("${strings.sErrServer} $responseCode")
                 return@withContext null
             }
 
-            onStatusUpdate("⬇️ جاري التحميل من السحابة...")
+            onStatusUpdate(strings.sDownloading)
             val fileLength = connection.contentLength
             val input = BufferedInputStream(connection.inputStream)
             val tempFile = File(context.cacheDir, "temp_face.apk")
@@ -549,25 +633,25 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
             output.flush(); output.close(); input.close()
             Uri.fromFile(tempFile)
         } catch (e: Exception) {
-            onStatusUpdate("❌ خطأ بالاتصال: ${e.message}")
+            onStatusUpdate("${strings.sErrConn} ${e.message}")
             null
         }
     }
 }
 
-suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
+suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, strings: AppStrings, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
-            onStatusUpdate("🔍 البحث عن الساعة...")
+            onStatusUpdate(strings.sSearchWatch)
             val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
             val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
             
             if (watchNode == null) { 
-                onStatusUpdate("❌ تأكد من تشغيل البلوتوث وربط الساعة!") 
+                onStatusUpdate(strings.sErrBlue) 
                 return@withContext 
             }
             
-            onStatusUpdate("🔄 تحضير الملف للنقل...")
+            onStatusUpdate(strings.sPreparing)
             val safeFile = File(context.cacheDir, "ready_to_send.apk")
             if (safeFile.exists()) safeFile.delete()
             
@@ -578,11 +662,11 @@ suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long,
                 }
                 inputStream.close()
             } else {
-                onStatusUpdate("❌ خطأ: لم أتمكن من قراءة الملف")
+                onStatusUpdate(strings.sErrRead)
                 return@withContext
             }
 
-            onStatusUpdate("📡 جاري نقل الملف بالكامل...")
+            onStatusUpdate(strings.sTransferring)
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
             
@@ -595,20 +679,17 @@ suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long,
                 }
             }
             
-            // النقل
             Tasks.await(channelClient.sendFile(channel, Uri.fromFile(safeFile)))
-            
-            // إغلاق القناة ضروري جداً لكي تعرف الساعة أن النقل انتهى
             channelClient.close(channel)
             
             progressJob.cancel()
             onProgressUpdate(1f)
-            onStatusUpdate("✅ تم النقل! جارٍ التثبيت في الساعة...")
+            onStatusUpdate(strings.sSuccessTrans)
             
             if(safeFile.exists()) safeFile.delete()
 
         } catch (e: Exception) { 
-            onStatusUpdate("❌ انقطع الاتصال: ${e.message}") 
+            onStatusUpdate("${strings.sErrLost} ${e.message}") 
         }
     }
 }
