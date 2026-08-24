@@ -54,7 +54,6 @@ import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
 
-    // متغيرات الساعة
     var watchReceiveStatus by mutableStateOf("جاهز للاستقبال")
     var watchReceivedMegabytes by mutableFloatStateOf(0f)
     var watchIsReceiving by mutableStateOf(false)
@@ -91,7 +90,6 @@ class MainActivity : ComponentActivity() {
                             channelClient.close(channel)
                         }
 
-                        // فاحص الملف الذكي
                         val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
                         
                         if (packageInfo != null) {
@@ -289,7 +287,7 @@ fun WatchModernUI(activity: MainActivity) {
 }
 
 // ==========================================
-// تصميم شاشة الهاتف (V5.6)
+// تصميم شاشة الهاتف (V5.7)
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
@@ -311,13 +309,13 @@ fun WearModernUI(
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var isSending by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
-    var selectedFacePreview by remember { mutableStateOf<StoreFace?>(null) } // متغير لعرض الصورة المكبرة
+    var selectedFacePreview by remember { mutableStateOf<StoreFace?>(null) }
     
     val coroutineScope = rememberCoroutineScope()
     
     val storeFaces = remember { mutableStateListOf(
-        StoreFace("1", "Casio Retro", "Classic Watch", "https://cdn2.f-cdn.com/contestentries/1381283/26462719/5b583f769fa95_thumb900.jpg", "https://f-droid.org/F-Droid.apk"),
-        StoreFace("2", "Pixel Minimal", "Modern UI", "https://i.pinimg.com/736x/87/4f/ea/874feab00bb7097c55c70757754d9299.jpg", "https://f-droid.org/F-Droid.apk")
+        StoreFace("1", "Casio Retro", "Classic Watch", "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80", "https://f-droid.org/F-Droid.apk"),
+        StoreFace("2", "Pixel Minimal", "Modern UI", "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=300&q=80", "https://f-droid.org/F-Droid.apk")
     )}
 
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -334,7 +332,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.6", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.7", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -365,6 +363,8 @@ fun WearModernUI(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
+            
+            // تم إصلاح تصميم زر الإرسال لتجنب تداخل الكلمات
             Button(
                 onClick = { 
                     if (selectedFileUri != null && !isSending) {
@@ -375,13 +375,14 @@ fun WearModernUI(
                         }
                     }
                 }, 
-                enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
+                enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
                 colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))
             ) {
-                Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(28.dp))
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
         } else {
             Box(modifier = Modifier.weight(1f)) {
@@ -393,7 +394,7 @@ fun WearModernUI(
                                 .padding(bottom = 12.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(offColor)
-                                .clickable { selectedFacePreview = face } // عند الضغط سيفتح الصورة المكبرة
+                                .clickable { selectedFacePreview = face }
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -425,13 +426,6 @@ fun WearModernUI(
                                 },
                                 modifier = Modifier.background(materialYouColor, CircleShape).size(40.dp)
                             ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = materialYouIcon, modifier = Modifier.size(20.dp)) }
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            IconButton(
-                                onClick = { storeFaces.remove(face) },
-                                modifier = Modifier.background(Color(0xFFEA4335).copy(alpha = 0.2f), CircleShape).size(40.dp)
-                            ) { Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Color(0xFFEA4335), modifier = Modifier.size(20.dp)) }
                         }
                     }
                 }
@@ -465,7 +459,6 @@ fun WearModernUI(
         }
     }
 
-    // نافذة التكبير وعرض تفاصيل الساعة
     if (selectedFacePreview != null) {
         AlertDialog(
             onDismissRequest = { selectedFacePreview = null },
@@ -476,10 +469,7 @@ fun WearModernUI(
                     AsyncImage(
                         model = selectedFacePreview!!.imageUrl,
                         contentDescription = "Preview",
-                        modifier = Modifier
-                            .size(200.dp)
-                            .clip(CircleShape)
-                            .background(Color.DarkGray)
+                        modifier = Modifier.size(200.dp).clip(CircleShape).background(Color.DarkGray)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("المطور: ${selectedFacePreview!!.author}", color = Color.LightGray, fontSize = 16.sp)
@@ -489,7 +479,7 @@ fun WearModernUI(
                 Button(
                     onClick = {
                         val face = selectedFacePreview!!
-                        selectedFacePreview = null // إغلاق النافذة
+                        selectedFacePreview = null 
                         if (!isSending) {
                             coroutineScope.launch {
                                 isSending = true; transferProgress = 0f
@@ -523,37 +513,13 @@ fun WearModernUI(
             title = { Text("إضافة واجهة جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    OutlinedTextField(
-                        value = newName, 
-                        onValueChange = { newName = it }, 
-                        label = { Text("اسم الواجهة (مثال: Rolex)", color = Color.Gray) }, 
-                        modifier = Modifier.fillMaxWidth(), 
-                        textStyle = TextStyle(color = Color.White)
-                    )
+                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text("اسم الواجهة", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), textStyle = TextStyle(color = Color.White))
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newAuthor, 
-                        onValueChange = { newAuthor = it }, 
-                        label = { Text("المطور", color = Color.Gray) }, 
-                        modifier = Modifier.fillMaxWidth(), 
-                        textStyle = TextStyle(color = Color.White)
-                    )
+                    OutlinedTextField(value = newAuthor, onValueChange = { newAuthor = it }, label = { Text("المطور", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), textStyle = TextStyle(color = Color.White))
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newImgUrl, 
-                        onValueChange = { newImgUrl = it }, 
-                        label = { Text("رابط الصورة (JPG/PNG)", color = Color.Gray) }, 
-                        modifier = Modifier.fillMaxWidth(), 
-                        textStyle = TextStyle(color = Color.White)
-                    )
+                    OutlinedTextField(value = newImgUrl, onValueChange = { newImgUrl = it }, label = { Text("رابط الصورة", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), textStyle = TextStyle(color = Color.White))
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newApkUrl, 
-                        onValueChange = { newApkUrl = it }, 
-                        label = { Text("رابط التحميل (APK)", color = Color.Gray) }, 
-                        modifier = Modifier.fillMaxWidth(), 
-                        textStyle = TextStyle(color = Color.White)
-                    )
+                    OutlinedTextField(value = newApkUrl, onValueChange = { newApkUrl = it }, label = { Text("رابط التحميل", color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), textStyle = TextStyle(color = Color.White))
                 }
             },
             confirmButton = {
@@ -631,6 +597,7 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
     }
 }
 
+// تم تحسين دالة الإرسال لتكون أقوى في التعامل مع انقطاع البلوتوث
 suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
@@ -648,21 +615,29 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
             if (inputStream != null && outputStream != null) {
                 onStatusUpdate("📡 جاري الإرسال للساعة...")
                 delay(500)
-                val buffer = ByteArray(8 * 1024)
-                var bytesCopied = 0L
-                var bytes = inputStream.read(buffer)
-                while (bytes >= 0) {
-                    outputStream.write(buffer, 0, bytes)
-                    bytesCopied += bytes
-                    if (totalSize > 0) onProgressUpdate(bytesCopied.toFloat() / totalSize.toFloat())
-                    bytes = inputStream.read(buffer)
+                
+                // استخدام use يضمن إغلاق القنوات بشكل آمن حتى لو انقطع الاتصال
+                inputStream.use { input ->
+                    outputStream.use { output ->
+                        val buffer = ByteArray(8 * 1024)
+                        var bytesCopied = 0L
+                        var bytes = input.read(buffer)
+                        while (bytes >= 0) {
+                            output.write(buffer, 0, bytes)
+                            bytesCopied += bytes
+                            if (totalSize > 0) onProgressUpdate(bytesCopied.toFloat() / totalSize.toFloat())
+                            bytes = input.read(buffer)
+                        }
+                        output.flush()
+                    }
                 }
-                outputStream.flush()
-                delay(1000)
-                inputStream.close(); outputStream.close(); channelClient.close(channel)
+                delay(500)
+                channelClient.close(channel)
                 onProgressUpdate(1f)
                 onStatusUpdate("✅ تم الإرسال بنجاح! راقب شاشة ساعتك.")
             }
-        } catch (e: Exception) { onStatusUpdate("❌ خطأ تقني: ${e.message}") }
+        } catch (e: Exception) { 
+            onStatusUpdate("❌ خطأ تقني: انقطع الاتصال") 
+        }
     }
 }
