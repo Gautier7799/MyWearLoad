@@ -376,23 +376,22 @@ fun WearModernUI(
         }
     }
 
-    // Force layout direction globally based on selected language
     CompositionLocalProvider(LocalLayoutDirection provides if (strings.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 32.dp)) {
             
-            // Header: Like the React Preview
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Lang Button (Left/Start)
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.CenterStart) {
                     Text(
                         text = activity.currentLang.name,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         modifier = Modifier
                             .background(primaryColor, RoundedCornerShape(12.dp))
                             .clickable { 
@@ -409,30 +408,36 @@ fun WearModernUI(
                                 }
                                 processStatus = ""
                             }
-                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
                     )
                 }
                 
                 // Title & Subtitle (Center)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(2f)
+                    modifier = Modifier.weight(1.5f)
                 ) {
-                    Text(strings.title, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1)
-                    Text(strings.subtitle, fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = strings.title, 
+                        fontSize = 24.sp, 
+                        fontWeight = FontWeight.ExtraBold, 
+                        color = Color.White, 
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(strings.subtitle, fontSize = 12.sp, color = warningColor, fontWeight = FontWeight.Bold)
                 }
                 
                 // Icon placeholder (Right/End)
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.CenterEnd) {
                     Box(
                         modifier = Modifier
-                            .size(50.dp)
+                            .size(46.dp)
                             .background(Color.Transparent, RoundedCornerShape(12.dp))
                             .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
                             .clip(RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Replace "ic_launcher" with your actual icon name if different
                         val imageId = activity.resources.getIdentifier("ic_launcher", "mipmap", activity.packageName)
                         if (imageId != 0) {
                             Image(
