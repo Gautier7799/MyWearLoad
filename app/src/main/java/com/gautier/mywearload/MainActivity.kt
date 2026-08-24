@@ -17,7 +17,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,13 +63,16 @@ enum class AppLang { AR, EN, FR }
 class AppStrings(val lang: AppLang) {
     val isRtl get() = lang == AppLang.AR
     
+    val title = "My WearLoad"
+    val subtitle = "Pro Edition V5.13"
+    
     val localFile get() = when(lang) { AppLang.AR -> "ملف محلي"; AppLang.EN -> "Local File"; AppLang.FR -> "Fichier Local" }
     val store get() = when(lang) { AppLang.AR -> "المتجر"; AppLang.EN -> "Store"; AppLang.FR -> "Boutique" }
-    val selectFile get() = when(lang) { AppLang.AR -> "اختر ملف Cadran"; AppLang.EN -> "Select Cadran File"; AppLang.FR -> "Sélectionner un fichier Cadran" }
+    val selectFile get() = when(lang) { AppLang.AR -> "اختر ملف Cadran"; AppLang.EN -> "Select Cadran File"; AppLang.FR -> "Sélectionner Cadran" }
     val fromStorage get() = when(lang) { AppLang.AR -> "من ذاكرة الهاتف"; AppLang.EN -> "From Phone Storage"; AppLang.FR -> "Depuis le stockage" }
     val readyToSend get() = when(lang) { AppLang.AR -> "جاهز للإرسال"; AppLang.EN -> "Ready to Send"; AppLang.FR -> "Prêt à envoyer" }
     val sendToWatch get() = when(lang) { AppLang.AR -> "إرسال إلى الساعة"; AppLang.EN -> "Send to Watch"; AppLang.FR -> "Envoyer à la montre" }
-    val sending get() = when(lang) { AppLang.AR -> "جاري الإرسال للساعة..."; AppLang.EN -> "Sending to Watch..."; AppLang.FR -> "Envoi à la montre..." }
+    val sending get() = when(lang) { AppLang.AR -> "جاري الإرسال..."; AppLang.EN -> "Sending..."; AppLang.FR -> "Envoi..." }
     val readyToUse get() = when(lang) { AppLang.AR -> "جاهز للاستخدام"; AppLang.EN -> "Ready to use"; AppLang.FR -> "Prêt à l'emploi" }
     val downloadSend get() = when(lang) { AppLang.AR -> "تحميل وإرسال"; AppLang.EN -> "Download & Send"; AppLang.FR -> "Télécharger & Envoyer" }
     val close get() = when(lang) { AppLang.AR -> "إغلاق"; AppLang.EN -> "Close"; AppLang.FR -> "Fermer" }
@@ -300,7 +306,7 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.padding(16.dp)
             ) {
-                Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
+                Text(strings.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (activity.watchIsReceiving) {
@@ -370,28 +376,25 @@ fun WearModernUI(
         }
     }
 
+    // Force layout direction globally based on selected language
     CompositionLocalProvider(LocalLayoutDirection provides if (strings.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 32.dp)) {
             
+            // Header: Like the React Preview
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.width(60.dp)) // Spacer for balance
-                
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("My WearLoad", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("Pro Edition V5.13", fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
-                }
-                
-                Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
+                // Lang Button (Left/Start)
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     Text(
                         text = activity.currentLang.name,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
                         modifier = Modifier
-                            .background(primaryColor, RoundedCornerShape(8.dp))
+                            .background(primaryColor, RoundedCornerShape(12.dp))
                             .clickable { 
                                 val nextLang = when (activity.currentLang) {
                                     AppLang.AR -> AppLang.EN
@@ -406,42 +409,84 @@ fun WearModernUI(
                                 }
                                 processStatus = ""
                             }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     )
                 }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                Button(
-                    onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") primaryColor else surfaceColor)
-                ) { Text(strings.localFile, color = Color.White, fontWeight = FontWeight.Bold) }
                 
-                Button(
-                    onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") primaryColor else surfaceColor)
-                ) { Text(strings.store, color = Color.White, fontWeight = FontWeight.Bold) }
-            }
-
-            if (currentTab == "LOCAL") {
-                Button(
-                    onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
-                    modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
-                    colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+                // Title & Subtitle (Center)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(2f)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(28.dp))
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
-                            Text(if (selectedFileUri == null) strings.selectFile else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(if (selectedFileUri == null) strings.fromStorage else strings.readyToSend, color = Color.LightGray, fontSize = 12.sp)
+                    Text(strings.title, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1)
+                    Text(strings.subtitle, fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
+                }
+                
+                // Icon placeholder (Right/End)
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .background(Color.Transparent, RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Replace "ic_launcher" with your actual icon name if different
+                        val imageId = activity.resources.getIdentifier("ic_launcher", "mipmap", activity.packageName)
+                        if (imageId != 0) {
+                            Image(
+                                painter = painterResource(id = imageId),
+                                contentDescription = "App Icon",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(Icons.Filled.Build, contentDescription = null, tint = primaryColor)
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Tabs
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp).height(56.dp)) {
+                Button(
+                    onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).fillMaxHeight(),
+                    shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 0.dp, bottomEnd = 0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") primaryColor else surfaceColor)
+                ) { Text(strings.localFile, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
                 
+                Button(
+                    onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).fillMaxHeight(),
+                    shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 12.dp, bottomEnd = 12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") primaryColor else surfaceColor)
+                ) { Text(strings.store, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            }
+
+            // Content
+            if (currentTab == "LOCAL") {
+                // Select File Button
+                Button(
+                    onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
+                    modifier = Modifier.fillMaxWidth().height(90.dp), 
+                    shape = RoundedCornerShape(16.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
+                            Text(if (selectedFileUri == null) strings.selectFile else selectedFileName, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (selectedFileUri == null) strings.fromStorage else strings.readyToSend, color = Color.LightGray, fontSize = 14.sp)
+                        }
+                        Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(32.dp))
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Send Button
                 Button(
                     onClick = { 
                         if (selectedFileUri != null && !isSending) {
@@ -452,20 +497,23 @@ fun WearModernUI(
                             }
                         }
                     }, 
-                    enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
-                    colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) successColor else surfaceColor.copy(alpha = 0.5f))
+                    enabled = selectedFileUri != null && !isSending, 
+                    modifier = Modifier.fillMaxWidth().height(60.dp).border(2.dp, if (selectedFileUri != null) Color.Gray else Color.DarkGray, RoundedCornerShape(16.dp)), 
+                    shape = RoundedCornerShape(16.dp), 
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent
+                    )
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(22.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isSending) strings.sending else strings.sendToWatch, 
-                            color = Color.White, 
-                            fontSize = 16.sp,
+                            color = if (selectedFileUri != null) Color.White else Color.Gray, 
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(Icons.Filled.Send, contentDescription = "Send", tint = if (selectedFileUri != null) Color.White else Color.Gray, modifier = Modifier.size(24.dp))
                     }
                 }
             } else {
@@ -475,25 +523,13 @@ fun WearModernUI(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 12.dp)
+                                    .padding(bottom = 16.dp)
                                     .clip(RoundedCornerShape(16.dp))
                                     .background(surfaceColor)
                                     .clickable { selectedFacePreview = face }
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                AsyncImage(
-                                    model = face.imageUrl,
-                                    contentDescription = "Watch Face",
-                                    modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
-                                )
-                                
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Text(face.author, color = Color.Gray, fontSize = 12.sp)
-                                }
-                                
                                 IconButton(
                                     onClick = {
                                         if (!isSending) {
@@ -508,29 +544,43 @@ fun WearModernUI(
                                             }
                                         }
                                     },
-                                    modifier = Modifier.background(primaryColor, CircleShape).size(40.dp)
-                                ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                                    modifier = Modifier.background(primaryColor, CircleShape).size(48.dp)
+                                ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(24.dp)) }
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(face.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    Text(face.author, color = Color.Gray, fontSize = 14.sp)
+                                }
+                                
+                                AsyncImage(
+                                    model = face.imageUrl,
+                                    contentDescription = "Watch Face",
+                                    modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray).border(1.dp, Color.Gray, CircleShape)
+                                )
                             }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = if (currentTab == "LOCAL") Modifier.weight(1f) else Modifier.height(8.dp))
+            Spacer(modifier = if (currentTab == "LOCAL") Modifier.weight(1f) else Modifier.height(16.dp))
 
+            // Status Footer
             Column(
-                modifier = Modifier.fillMaxWidth().background(surfaceColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
+                modifier = Modifier.fillMaxWidth().background(surfaceColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
             ) {
                 if (isSending || transferProgress > 0f) {
-                    LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape), color = successColor, trackColor = bgColor)
+                    LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = successColor, trackColor = bgColor)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
                     if (processStatus.isNotEmpty()) Text(processStatus, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 } else if (processStatus.isNotEmpty()) {
                     Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else successColor, fontWeight = FontWeight.Medium, fontSize = 14.sp, textAlign = TextAlign.Center)
                 } else {
-                    Text(strings.readyToUse, color = Color.Gray, fontSize = 12.sp)
+                    Text(strings.readyToUse, color = Color.Gray, fontSize = 14.sp)
                 }
             }
         }
