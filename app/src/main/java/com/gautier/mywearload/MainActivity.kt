@@ -75,7 +75,8 @@ class MainActivity : ComponentActivity() {
                         val channelClient = Wearable.getChannelClient(this@MainActivity)
                         val inputStream = Tasks.await(channelClient.getInputStream(channel))
                         val outputStream = FileOutputStream(apkFile)
-                        val buffer = ByteArray(8 * 1024)
+                        // زيادة حجم الحزمة لتسريع الاستقبال في الساعة
+                        val buffer = ByteArray(16 * 1024)
                         var bytesRead: Int
                         
                         try {
@@ -244,9 +245,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ==========================================
-// تصميم شاشة الساعة
-// ==========================================
 @Composable
 fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Color, red: Color) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -255,7 +253,6 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(16.dp)
         ) {
-            // تمت إزالة استدعاء الصورة لتجنب خطأ الـ Build
             Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -280,9 +277,6 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
     }
 }
 
-// ==========================================
-// تصميم شاشة الهاتف (V5.10)
-// ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -324,10 +318,9 @@ fun WearModernUI(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        // تمت إزالة استدعاء الصورة لتجنب خطأ الـ Build
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.10", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.11", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -350,11 +343,13 @@ fun WearModernUI(
                 modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
                 colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
             ) {
-                Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(28.dp))
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
-                    Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text(if (selectedFileUri == null) "من ذاكرة الهاتف" else "جاهز للإرسال", color = Color.LightGray, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
+                        Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(if (selectedFileUri == null) "من ذاكرة الهاتف" else "جاهز للإرسال", color = Color.LightGray, fontSize = 12.sp)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -372,10 +367,11 @@ fun WearModernUI(
                 enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
                 colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) successColor else surfaceColor.copy(alpha = 0.5f))
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                // إصلاح مشكلة تداخل النص في الزر
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isSending) "جاري الإرسال..." else "إرسال للساعة", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         } else {
@@ -571,7 +567,7 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
             if (tempFile.exists()) tempFile.delete()
             
             val output = FileOutputStream(tempFile)
-            val data = ByteArray(8 * 1024)
+            val data = ByteArray(16 * 1024)
             var total = 0L
             var count: Int
             
@@ -597,25 +593,35 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
             val watchNode = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
             if (watchNode == null) { onStatusUpdate("❌ فشل: تأكد من تشغيل البلوتوث وربط الساعة!"); return@withContext }
             
+            // إصلاح الإرسال: نسخ الملف إلى الذاكرة المؤقتة (Cache) لضمان عدم انقطاع القراءة
+            val safeFile = File(context.cacheDir, "safe_send.apk")
+            context.contentResolver.openInputStream(apkUri)?.use { input ->
+                FileOutputStream(safeFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            val actualSize = safeFile.length()
+
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
             
-            val inputStream = if (apkUri.scheme == "file") FileInputStream(File(apkUri.path!!)) else context.contentResolver.openInputStream(apkUri)
+            val inputStream = FileInputStream(safeFile)
             val outputStream = Tasks.await(channelClient.getOutputStream(channel))
             
-            if (inputStream != null && outputStream != null) {
+            if (outputStream != null) {
                 onStatusUpdate("📡 جاري الإرسال للساعة...")
                 delay(500)
                 
                 inputStream.use { input ->
                     outputStream.use { output ->
-                        val buffer = ByteArray(8 * 1024)
+                        // زيادة حجم الحزمة (Buffer) ليكون الإرسال أسرع وأكثر استقراراً
+                        val buffer = ByteArray(16 * 1024)
                         var bytesCopied = 0L
                         var bytes = input.read(buffer)
                         while (bytes >= 0) {
                             output.write(buffer, 0, bytes)
                             bytesCopied += bytes
-                            if (totalSize > 0) onProgressUpdate(bytesCopied.toFloat() / totalSize.toFloat())
+                            if (actualSize > 0) onProgressUpdate(bytesCopied.toFloat() / actualSize.toFloat())
                             bytes = input.read(buffer)
                         }
                         output.flush()
@@ -627,7 +633,7 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                 onStatusUpdate("✅ تم الإرسال بنجاح! راقب شاشة ساعتك.")
             }
         } catch (e: Exception) { 
-            onStatusUpdate("❌ خطأ تقني: انقطع الاتصال") 
+            onStatusUpdate("❌ خطأ تقني: انقطع الاتصال، أعد المحاولة") 
         }
     }
 }
