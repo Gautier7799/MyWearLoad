@@ -17,6 +17,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -173,13 +174,13 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val bgColor = Color(0xFF191C1B) // Material You Dark Background
+            val bgColor = Color(0xFF191C1B) 
             val googleBlue = Color(0xFF4285F4)
             val googleYellow = Color(0xFFFBBC05)
             val googleGreen = Color(0xFF34A853)
             val googleRed = Color(0xFFEA4335)
-            val surfaceColor = Color(0xFF2C322F) // Material You Dark Surface
-            val pillActive = Color(0xFF89D6B3) // Light Green Accent
+            val surfaceColor = Color(0xFF2C322F) 
+            val pillActive = Color(0xFF89D6B3) 
             val pillActiveText = Color(0xFF003824)
 
             if (isWatch) {
@@ -387,14 +388,24 @@ fun WearModernUI(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    val imageId = activity.resources.getIdentifier("ic_app_logo", "drawable", activity.packageName)
+                    if (imageId != 0) {
+                        Image(
+                            painter = painterResource(id = imageId),
+                            contentDescription = "App Icon",
+                            modifier = Modifier.size(36.dp).clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Text("⌚", fontSize = 28.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                     Text(
                         text = strings.title, 
                         fontSize = 32.sp, 
                         fontWeight = FontWeight.ExtraBold, 
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("⌚", fontSize = 28.sp)
                 }
                 Text(strings.subtitle, fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
             }
