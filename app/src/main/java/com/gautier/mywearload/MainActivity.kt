@@ -123,21 +123,24 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val darkBg = Color(0xFF19242C) 
+            // ألوان مستوحاة من شعار Wear OS الذي اخترته
+            val bgColor = Color(0xFF1E1E24) // خلفية داكنة أنيقة تبرز الألوان
+            val googleBlue = Color(0xFF4285F4)
+            val googleYellow = Color(0xFFFBBC05)
+            val googleGreen = Color(0xFF34A853)
+            val googleRed = Color(0xFFEA4335)
+            val surfaceColor = Color(0xFF2C2C35) // لون البطاقات
+
             if (isWatch) {
                 MaterialTheme {
-                    Surface(modifier = Modifier.fillMaxSize(), color = darkBg) {
-                        WatchModernUI(this)
+                    Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
+                        WatchModernUI(this, googleBlue, googleGreen, googleYellow, googleRed)
                     }
                 }
             } else {
-                val buttonOffBg = Color(0xFF2C3E48) 
-                val buttonOnBg = Color(0xFF3B82F6) 
-                val materialYouColor = Color(0xFFC3E7FF) 
-                val materialYouIcon = Color(0xFF004A77) 
                 MaterialTheme { 
-                    Surface(modifier = Modifier.fillMaxSize(), color = darkBg) { 
-                        WearModernUI(this, darkBg, buttonOffBg, buttonOnBg, materialYouColor, materialYouIcon) 
+                    Surface(modifier = Modifier.fillMaxSize(), color = bgColor) { 
+                        WearModernUI(this, bgColor, surfaceColor, googleBlue, googleGreen, googleYellow) 
                     } 
                 }
             }
@@ -206,7 +209,6 @@ class MainActivity : ComponentActivity() {
             }
 
             val intentFilter = IntentFilter(action)
-            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(receiver, intentFilter, Context.RECEIVER_EXPORTED)
             } else {
@@ -247,36 +249,28 @@ class MainActivity : ComponentActivity() {
 // تصميم شاشة الساعة
 // ==========================================
 @Composable
-fun WatchModernUI(activity: MainActivity) {
+fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Color, red: Color) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(16.dp)
         ) {
-            Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC3E7FF))
+            Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
             Spacer(modifier = Modifier.height(12.dp))
 
             if (activity.watchIsReceiving) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp),
-                    color = Color(0xFF3B82F6),
-                    strokeWidth = 4.dp
-                )
+                CircularProgressIndicator(modifier = Modifier.size(48.dp), color = blue, strokeWidth = 4.dp)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(String.format("%.1f MB", activity.watchReceivedMegabytes), fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
             } else if (activity.watchIsSuccess) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = Color(0xFF34A853), modifier = Modifier.size(48.dp))
+                Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = green, modifier = Modifier.size(48.dp))
             } else if (activity.watchReceiveStatus.contains("❌")) {
-                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = Color(0xFFEA4335), modifier = Modifier.size(48.dp))
+                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = red, modifier = Modifier.size(48.dp))
             } else if (activity.watchReceiveStatus.contains("⏳")) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp),
-                    color = Color(0xFFFABB05), 
-                    strokeWidth = 4.dp
-                )
+                CircularProgressIndicator(modifier = Modifier.size(48.dp), color = yellow, strokeWidth = 4.dp)
             } else {
-                Box(modifier = Modifier.size(48.dp).background(Color(0xFF2C3E48), CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(48.dp).background(Color.DarkGray, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
                     Text("⌚", fontSize = 20.sp)
                 }
             }
@@ -287,7 +281,7 @@ fun WatchModernUI(activity: MainActivity) {
 }
 
 // ==========================================
-// تصميم شاشة الهاتف (V5.7)
+// تصميم شاشة الهاتف (V5.8)
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
@@ -295,11 +289,11 @@ data class StoreFace(val id: String, val name: String, val author: String, val i
 @Composable
 fun WearModernUI(
     activity: MainActivity, 
-    darkBg: Color, 
-    offColor: Color, 
-    onColor: Color,
-    materialYouColor: Color,
-    materialYouIcon: Color
+    bgColor: Color, 
+    surfaceColor: Color, 
+    primaryColor: Color,
+    successColor: Color,
+    warningColor: Color
 ) {
     var currentTab by remember { mutableStateOf("LOCAL") }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
@@ -332,20 +326,20 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.7", fontSize = 16.sp, color = materialYouColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.8", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold) // استخدام الأصفر هنا
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Button(
                 onClick = { currentTab = "LOCAL" }, modifier = Modifier.weight(1f).height(50.dp),
                 shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") onColor else offColor)
+                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "LOCAL") primaryColor else surfaceColor)
             ) { Text("ملف محلي", color = Color.White, fontWeight = FontWeight.Bold) }
             
             Button(
                 onClick = { currentTab = "STORE" }, modifier = Modifier.weight(1f).height(50.dp),
                 shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") onColor else offColor)
+                colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "STORE") primaryColor else surfaceColor)
             ) { Text("المتجر", color = Color.White, fontWeight = FontWeight.Bold) }
         }
 
@@ -353,9 +347,9 @@ fun WearModernUI(
             Button(
                 onClick = { filePickerLauncher.launch("application/vnd.android.package-archive") }, 
                 modifier = Modifier.fillMaxWidth().height(80.dp), shape = RoundedCornerShape(24.dp), 
-                colors = ButtonDefaults.buttonColors(containerColor = offColor)
+                colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
             ) {
-                Icon(Icons.Filled.Build, contentDescription = "File", tint = Color.LightGray, modifier = Modifier.size(28.dp))
+                Icon(Icons.Filled.Build, contentDescription = "File", tint = primaryColor, modifier = Modifier.size(28.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
                     Text(if (selectedFileUri == null) "اختر ملف Cadran" else selectedFileName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -364,7 +358,6 @@ fun WearModernUI(
             }
             Spacer(modifier = Modifier.height(16.dp))
             
-            // تم إصلاح تصميم زر الإرسال لتجنب تداخل الكلمات
             Button(
                 onClick = { 
                     if (selectedFileUri != null && !isSending) {
@@ -376,7 +369,7 @@ fun WearModernUI(
                     }
                 }, 
                 enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
-                colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) onColor else offColor.copy(alpha = 0.5f))
+                colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) successColor else surfaceColor.copy(alpha = 0.5f))
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -393,7 +386,7 @@ fun WearModernUI(
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(offColor)
+                                .background(surfaceColor)
                                 .clickable { selectedFacePreview = face }
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -424,8 +417,8 @@ fun WearModernUI(
                                         }
                                     }
                                 },
-                                modifier = Modifier.background(materialYouColor, CircleShape).size(40.dp)
-                            ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = materialYouIcon, modifier = Modifier.size(20.dp)) }
+                                modifier = Modifier.background(primaryColor, CircleShape).size(40.dp)
+                            ) { Icon(Icons.Filled.ShoppingCart, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(20.dp)) }
                         }
                     }
                 }
@@ -433,26 +426,24 @@ fun WearModernUI(
                 FloatingActionButton(
                     onClick = { showAddDialog = true },
                     modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                    containerColor = onColor
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add Store", tint = Color.White)
-                }
+                    containerColor = primaryColor
+                ) { Icon(Icons.Filled.Add, contentDescription = "Add Store", tint = Color.White) }
             }
         }
 
         Spacer(modifier = if (currentTab == "LOCAL") Modifier.weight(1f) else Modifier.height(8.dp))
 
         Column(
-            modifier = Modifier.fillMaxWidth().background(offColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
+            modifier = Modifier.fillMaxWidth().background(surfaceColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(16.dp).heightIn(min = 60.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
         ) {
             if (isSending || transferProgress > 0f) {
-                LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape), color = Color(0xFF34A853), trackColor = darkBg)
+                LinearProgressIndicator(progress = transferProgress, modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape), color = successColor, trackColor = bgColor)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("${(transferProgress * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
                 if (processStatus.isNotEmpty()) Text(processStatus, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             } else if (processStatus.isNotEmpty()) {
-                Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else Color(0xFF81C995), fontWeight = FontWeight.Medium, fontSize = 14.sp, textAlign = TextAlign.Center)
+                Text(processStatus, color = if (processStatus.contains("❌")) Color(0xFFEA4335) else successColor, fontWeight = FontWeight.Medium, fontSize = 14.sp, textAlign = TextAlign.Center)
             } else {
                 Text("جاهز للاستخدام", color = Color.Gray, fontSize = 12.sp)
             }
@@ -462,7 +453,7 @@ fun WearModernUI(
     if (selectedFacePreview != null) {
         AlertDialog(
             onDismissRequest = { selectedFacePreview = null },
-            containerColor = offColor,
+            containerColor = surfaceColor,
             title = { Text(selectedFacePreview!!.name, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -492,7 +483,7 @@ fun WearModernUI(
                             }
                         }
                     }, 
-                    colors = ButtonDefaults.buttonColors(containerColor = onColor)
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
                 ) { Text("تحميل وإرسال", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
@@ -509,7 +500,7 @@ fun WearModernUI(
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            containerColor = offColor,
+            containerColor = surfaceColor,
             title = { Text("إضافة واجهة جديدة", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
@@ -528,7 +519,7 @@ fun WearModernUI(
                         storeFaces.add(StoreFace(System.currentTimeMillis().toString(), newName, newAuthor, newImgUrl, newApkUrl))
                         showAddDialog = false
                     }
-                }, colors = ButtonDefaults.buttonColors(containerColor = onColor)) { Text("حفظ وإضافة") }
+                }, colors = ButtonDefaults.buttonColors(containerColor = primaryColor)) { Text("حفظ وإضافة") }
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false }) { Text("إلغاء", color = Color.LightGray) }
@@ -597,7 +588,6 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
     }
 }
 
-// تم تحسين دالة الإرسال لتكون أقوى في التعامل مع انقطاع البلوتوث
 suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
@@ -616,7 +606,6 @@ suspend fun sendApkWithProgress(context: Context, apkUri: Uri, totalSize: Long, 
                 onStatusUpdate("📡 جاري الإرسال للساعة...")
                 delay(500)
                 
-                // استخدام use يضمن إغلاق القنوات بشكل آمن حتى لو انقطع الاتصال
                 inputStream.use { input ->
                     outputStream.use { output ->
                         val buffer = ByteArray(8 * 1024)
