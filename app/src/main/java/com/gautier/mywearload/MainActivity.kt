@@ -56,18 +56,16 @@ import coil.compose.AsyncImage
 class MainActivity : ComponentActivity() {
 
     var watchReceiveStatus by mutableStateOf("جاهز للاستقبال")
-    var watchReceivedMegabytes by mutableFloatStateOf(0f)
     var watchIsReceiving by mutableStateOf(false)
     var watchIsSuccess by mutableStateOf(false)
 
-    // المستمع الجديد المبسط والفعال لنقل الملفات بالكامل
+    // المستمع المحدث: ينتظر انتهاء النقل تماماً قبل فحص الملف
     private val channelCallback = object : ChannelClient.ChannelCallback() {
         override fun onChannelOpened(channel: ChannelClient.Channel) {
             if (channel.path == "/wearload_apk_transfer") {
                 watchIsReceiving = true
                 watchIsSuccess = false
                 watchReceiveStatus = "جاري استلام الملف..."
-                watchReceivedMegabytes = 0f
 
                 CoroutineScope(Dispatchers.IO).launch {
                     val apkFile = File(cacheDir, "received_app.apk")
@@ -75,31 +73,38 @@ class MainActivity : ComponentActivity() {
 
                     try {
                         val channelClient = Wearable.getChannelClient(this@MainActivity)
-                        // الطريقة الجديدة: استلام الملف ككتلة واحدة (أكثر استقراراً)
+                        // هذا الأمر يخبر النظام أين يضع الملف، ويعود فوراً (لا ينتظر النقل)
                         Tasks.await(channelClient.receiveFile(channel, Uri.fromFile(apkFile), false))
-                        
-                        val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
-                        
-                        if (packageInfo != null) {
-                            watchIsReceiving = false
-                            watchReceiveStatus = "⏳ جاري تحضير شاشة التثبيت..."
-                            installApk(apkFile)
-                        } else {
-                            watchIsReceiving = false
-                            watchIsSuccess = false
-                            watchReceiveStatus = "❌ الملف تالف، أعد المحاولة"
-                        }
                     } catch (e: Exception) {
                         watchIsReceiving = false
                         watchIsSuccess = false
-                        watchReceiveStatus = "❌ خطأ في الاتصال: ${e.message}"
+                        watchReceiveStatus = "❌ خطأ في بدء الاستلام"
                     }
                 }
             }
         }
         
-        override fun onInputClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
-            // يتم استدعاؤه عند انتهاء النقل
+        // هنا يكمن الحل! ننتظر حتى يغلق الهاتف القناة (مما يعني انتهاء النقل 100%)
+        override fun onChannelClosed(channel: ChannelClient.Channel, closeReason: Int, appSpecificErrorCode: Int) {
+            if (channel.path == "/wearload_apk_transfer") {
+                CoroutineScope(Dispatchers.IO).launch {
+                    watchReceiveStatus = "⏳ جاري فحص الملف..."
+                    delay(1500) // انتظار ثانية ونصف لضمان حفظ الملف في ذاكرة الساعة بالكامل
+                    
+                    val apkFile = File(cacheDir, "received_app.apk")
+                    val packageInfo = packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+                    
+                    if (packageInfo != null) {
+                        watchIsReceiving = false
+                        watchReceiveStatus = "⏳ جاري تحضير شاشة التثبيت..."
+                        installApk(apkFile)
+                    } else {
+                        watchIsReceiving = false
+                        watchIsSuccess = false
+                        watchReceiveStatus = "❌ الملف تالف، أعد المحاولة"
+                    }
+                }
+            }
         }
     }
 
@@ -248,7 +253,6 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
             if (activity.watchIsReceiving) {
                 CircularProgressIndicator(modifier = Modifier.size(40.dp), color = blue, strokeWidth = 3.dp)
                 Spacer(modifier = Modifier.height(8.dp))
-                // إخفاء الـ Megabytes لأن الطريقة الجديدة لا تدعم تتبع التقدم بالبايت في الساعة
                 Text("جاري النقل...", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
             } else if (activity.watchIsSuccess) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = green, modifier = Modifier.size(40.dp))
@@ -299,7 +303,6 @@ fun WearModernUI(
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             try {
-                // محاولة أخذ صلاحية دائمة لقراءة الملف لمنع النظام من قطع الاتصال
                 val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION
                 activity.contentResolver.takePersistableUriPermission(uri, takeFlags)
             } catch (e: Exception) { }
@@ -316,7 +319,7 @@ fun WearModernUI(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.12", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold)
+            Text("Pro Edition V5.13", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -363,14 +366,13 @@ fun WearModernUI(
                 enabled = selectedFileUri != null && !isSending, modifier = Modifier.fillMaxWidth().height(70.dp), shape = RoundedCornerShape(24.dp), 
                 colors = ButtonDefaults.buttonColors(containerColor = if (selectedFileUri != null) successColor else surfaceColor.copy(alpha = 0.5f))
             ) {
-                // إصلاح نهائي لتصميم زر الإرسال (إجبار النص على البقاء في سطر واحد بحجم أصغر)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(22.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isSending) "جاري الإرسال للساعة..." else "إرسال إلى الساعة", 
                         color = Color.White, 
-                        fontSize = 16.sp, // تصغير الخط ليتناسب مع الشاشات الصغيرة
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -553,7 +555,6 @@ suspend fun downloadApkFromUrl(context: Context, urlString: String, onProgressUp
     }
 }
 
-// الطريقة الحديثة والصلبة لنقل الملفات إلى الساعة بدون انقطاع
 suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long, onProgressUpdate: (Float) -> Unit, onStatusUpdate: (String) -> Unit) {
     withContext(Dispatchers.IO) {
         try {
@@ -570,7 +571,6 @@ suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long,
             val safeFile = File(context.cacheDir, "ready_to_send.apk")
             if (safeFile.exists()) safeFile.delete()
             
-            // نسخ الملف المختار إلى الكاش الداخلي للتطبيق ليتم إرساله ككتلة واحدة بأمان
             val inputStream = if (apkUri.scheme == "file") FileInputStream(File(apkUri.path!!)) else context.contentResolver.openInputStream(apkUri)
             if (inputStream != null) {
                 FileOutputStream(safeFile).use { output ->
@@ -586,7 +586,6 @@ suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long,
             val channelClient = Wearable.getChannelClient(context)
             val channel = Tasks.await(channelClient.openChannel(watchNode.id, "/wearload_apk_transfer"))
             
-            // محاكاة شريط التقدم أثناء انتظار إرسال الملف (لأن sendFile لا يعطي تقريراً بالتقدم)
             val progressJob = launch {
                 var simProgress = 0f
                 while(simProgress < 0.95f) {
@@ -596,14 +595,16 @@ suspend fun sendApkToWatchModern(context: Context, apkUri: Uri, totalSize: Long,
                 }
             }
             
-            // إرسال الملف دفعة واحدة (أكثر طريقة معتمدة واستقراراً)
+            // النقل
             Tasks.await(channelClient.sendFile(channel, Uri.fromFile(safeFile)))
+            
+            // إغلاق القناة ضروري جداً لكي تعرف الساعة أن النقل انتهى
+            channelClient.close(channel)
             
             progressJob.cancel()
             onProgressUpdate(1f)
             onStatusUpdate("✅ تم النقل! جارٍ التثبيت في الساعة...")
             
-            // تنظيف
             if(safeFile.exists()) safeFile.delete()
 
         } catch (e: Exception) { 
