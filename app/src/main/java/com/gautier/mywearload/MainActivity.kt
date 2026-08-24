@@ -16,6 +16,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,13 +125,12 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // ألوان مستوحاة من شعار Wear OS الذي اخترته
-            val bgColor = Color(0xFF1E1E24) // خلفية داكنة أنيقة تبرز الألوان
+            val bgColor = Color(0xFF1E1E24)
             val googleBlue = Color(0xFF4285F4)
             val googleYellow = Color(0xFFFBBC05)
             val googleGreen = Color(0xFF34A853)
             val googleRed = Color(0xFFEA4335)
-            val surfaceColor = Color(0xFF2C2C35) // لون البطاقات
+            val surfaceColor = Color(0xFF2C2C35)
 
             if (isWatch) {
                 MaterialTheme {
@@ -256,32 +257,39 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(16.dp)
         ) {
-            Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
+            // إضافة اللوجو في شاشة الساعة
+            Image(
+                painter = painterResource(id = R.mipmap.ic_launcher),
+                contentDescription = "App Logo",
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("My WearLoad", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = blue)
             Spacer(modifier = Modifier.height(12.dp))
 
             if (activity.watchIsReceiving) {
-                CircularProgressIndicator(modifier = Modifier.size(48.dp), color = blue, strokeWidth = 4.dp)
+                CircularProgressIndicator(modifier = Modifier.size(40.dp), color = blue, strokeWidth = 3.dp)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(String.format("%.1f MB", activity.watchReceivedMegabytes), fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(String.format("%.1f MB", activity.watchReceivedMegabytes), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
             } else if (activity.watchIsSuccess) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = green, modifier = Modifier.size(48.dp))
+                Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = green, modifier = Modifier.size(40.dp))
             } else if (activity.watchReceiveStatus.contains("❌")) {
-                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = red, modifier = Modifier.size(48.dp))
+                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = red, modifier = Modifier.size(40.dp))
             } else if (activity.watchReceiveStatus.contains("⏳")) {
-                CircularProgressIndicator(modifier = Modifier.size(48.dp), color = yellow, strokeWidth = 4.dp)
+                CircularProgressIndicator(modifier = Modifier.size(40.dp), color = yellow, strokeWidth = 3.dp)
             } else {
-                Box(modifier = Modifier.size(48.dp).background(Color.DarkGray, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
-                    Text("⌚", fontSize = 20.sp)
+                Box(modifier = Modifier.size(40.dp).background(Color.DarkGray, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
+                    Text("⌚", fontSize = 18.sp)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(activity.watchReceiveStatus, fontSize = 12.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+            Text(activity.watchReceiveStatus, fontSize = 11.sp, color = Color.LightGray, textAlign = TextAlign.Center)
         }
     }
 }
 
 // ==========================================
-// تصميم شاشة الهاتف (V5.8)
+// تصميم شاشة الهاتف (V5.9)
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
@@ -324,9 +332,16 @@ fun WearModernUI(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.8", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold) // استخدام الأصفر هنا
+        // إضافة اللوجو في شاشة الهاتف
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(
+                painter = painterResource(id = R.mipmap.ic_launcher),
+                contentDescription = "App Logo",
+                modifier = Modifier.size(72.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("My WearLoad", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Pro Edition V5.9", fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
