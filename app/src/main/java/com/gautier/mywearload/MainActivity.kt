@@ -16,7 +16,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -257,14 +255,8 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(16.dp)
         ) {
-            // إضافة اللوجو في شاشة الساعة
-            Image(
-                painter = painterResource(id = R.mipmap.ic_launcher),
-                contentDescription = "App Logo",
-                modifier = Modifier.size(40.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("My WearLoad", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = blue)
+            // تمت إزالة استدعاء الصورة لتجنب خطأ الـ Build
+            Text("My WearLoad", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = blue)
             Spacer(modifier = Modifier.height(12.dp))
 
             if (activity.watchIsReceiving) {
@@ -289,7 +281,7 @@ fun WatchModernUI(activity: MainActivity, blue: Color, green: Color, yellow: Col
 }
 
 // ==========================================
-// تصميم شاشة الهاتف (V5.9)
+// تصميم شاشة الهاتف (V5.10)
 // ==========================================
 data class StoreFace(val id: String, val name: String, val author: String, val imageUrl: String, val downloadUrl: String)
 
@@ -332,16 +324,10 @@ fun WearModernUI(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        // إضافة اللوجو في شاشة الهاتف
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(
-                painter = painterResource(id = R.mipmap.ic_launcher),
-                contentDescription = "App Logo",
-                modifier = Modifier.size(72.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("My WearLoad", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("Pro Edition V5.9", fontSize = 14.sp, color = warningColor, fontWeight = FontWeight.Bold)
+        // تمت إزالة استدعاء الصورة لتجنب خطأ الـ Build
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("My WearLoad", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Pro Edition V5.10", fontSize = 16.sp, color = warningColor, fontWeight = FontWeight.Bold)
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
